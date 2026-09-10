@@ -1,0 +1,51 @@
+# Archivos generados por la compilación (Build artifacts)
+bin/
+gen/
+out/
+/build
+.gradle
+.externalNativeBuild
+.cxx
+*.apk
+*.aar
+*.ap_
+*.dex
+*.class
+
+# IDE - IntelliJ / Android Studio
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/shelf/
+.idea/dbnavigator.xml
+*.iml
+*.iws
+*.ipr
+/captures/
+
+# Archivos de configuración local (¡Muy importante!)
+local.properties
+
+# Archivos de registro (Logs)
+*.log
+
+# Archivos de claves y firmado (Sensitive info)
+*.jks
+*.keystore
+*.p12
+*.key
+*.pub
+
+# Google Services (Opcional: ignóralo si el repo es público)
+# google-services.json
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Capturas de pantalla y grabaciones de Android Studio
+/captures/
