@@ -2,10 +2,13 @@ package com.proyectotitulo.appcomerciojcc.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Paleta de Colores Extraída del Diseño del Proyecto
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val PurplePrimary = Color(0xFF6750A4)      // Color Primario (Acciones principales)
+val SecondaryVariant = Color(0xFF625B71)   // Color Secundario (Filtros / Elementos menores)
+val TertiaryAccent = Color(0xFF7D5260)     // Color Terciario (Destacados / Rarezas)
+val ErrorColor = Color(0xFFB3261E)         // Color de Error / Baneo
+val BackgroundLight = Color(0xFFFFFBFE)    // Fondo neutro modo claro
+val SurfaceLight = Color(0xFFFFFBFE)       // Superficies
+val OnPrimaryLight = Color(0xFFFFFFFF)     // Texto sobre color primario
+val OnBackgroundLight = Color(0xFF1C1B1F)  // Texto principal sobre fondo
