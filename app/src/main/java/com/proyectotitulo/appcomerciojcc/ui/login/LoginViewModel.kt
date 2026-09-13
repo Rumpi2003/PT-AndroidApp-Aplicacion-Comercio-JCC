@@ -6,13 +6,14 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.proyectotitulo.appcomerciojcc.data.repository.LoginRepository
+import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 import kotlinx.coroutines.launch
 class LoginViewModel : ViewModel() {
 
     private val repository = LoginRepository()
 
-    private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading : LiveData<Boolean> = _isLoading
+    private val _uiState = MutableLiveData<LoginUiState>(LoginUiState.Idle)
+    val uiState: LiveData<LoginUiState> = _uiState
 
     private val _email = MutableLiveData<String>()
     val email : LiveData<String> = _email
@@ -27,6 +28,10 @@ class LoginViewModel : ViewModel() {
         _email.value = email
         _password.value = password
         _loginEnable.value = isValidEmail(email) && isValidPassword(password)
+
+        if (_uiState.value is LoginUiState.Error) {
+            _uiState.value = LoginUiState.Idle
+        }
     }
 
     private fun isValidEmail(email: String): Boolean = Patterns.EMAIL_ADDRESS.matcher(email).matches()
@@ -37,23 +42,21 @@ class LoginViewModel : ViewModel() {
         val currentPassword = password.value.orEmpty()
 
         viewModelScope.launch {
-            _isLoading.value = true
+            _uiState.value = LoginUiState.Loading
 
             val result = repository.doLogin(currentEmail, currentPassword)
 
             result.onSuccess { response ->
                 if (response.status == "success") {
-                    println("Login exitoso: ${response.message}")
-                    println("Nombre de usuario: ${response.data?.user?.username}")
-                    println("Token: ${response.data?.token}")
+                    val username = response.data?.user?.username.orEmpty()
+                    _uiState.value = LoginUiState.Succes(username, response.message)
                 } else {
-                    println("Error de API: ${response.message}: ${response.errors}")
+                    _uiState.value = LoginUiState.Error(response.errors)
                 }
             }.onFailure { error ->
-                println("Error de red: ${error.message}")
+                val errors = listOf<String>(error.message?: "Error de red inesperado")
+                _uiState.value = LoginUiState.Error(errors)
             }
-
-            _isLoading.value = false
         }
     }
 }

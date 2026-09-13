@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import java.nio.file.WatchEvent
 import androidx.compose.material3.CircularProgressIndicator
+import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 
 @Composable
 fun LoginScreen(viewModel: LoginViewModel, modifier: Modifier = Modifier){
@@ -61,7 +62,8 @@ fun Login(modifier: Modifier, vArrangement: Arrangement.Vertical, hAlignment: Al
     val email: String by viewModel.email.observeAsState(initial = "")
     val password: String by viewModel.password.observeAsState(initial = "")
     val loginEnable: Boolean by viewModel.loginEnable.observeAsState(initial = false)
-    val isLoading: Boolean by viewModel.isLoading.observeAsState(initial = false)
+    val uiState: LoginUiState by viewModel.uiState.observeAsState(initial = LoginUiState.Idle)
+    val isLoading = uiState is LoginUiState.Loading
 
     Column(
         modifier = modifier,
@@ -74,6 +76,8 @@ fun Login(modifier: Modifier, vArrangement: Arrangement.Vertical, hAlignment: Al
         Spacer(modifier = Modifier.height(16.dp))
         PasswordField(password, enabled = !isLoading) { viewModel.onTextFieldChanged(email, it) }
         ForgotPassword()
+        Spacer(modifier = Modifier.height(16.dp))
+        ErrorMessage(uiState)
         Spacer(modifier = Modifier.height(24.dp))
         LoginButton(loginEnable, isLoading) {viewModel.onLoginSelected()}
         Spacer(modifier = Modifier.height(16.dp))
@@ -81,7 +85,6 @@ fun Login(modifier: Modifier, vArrangement: Arrangement.Vertical, hAlignment: Al
     }
 }
 
-@Preview
 @Composable
 fun Header() {
     Image(
@@ -173,6 +176,21 @@ fun ForgotPassword() {
                 text = "¿Olvidaste tu contraseña?",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+fun ErrorMessage(uiState: LoginUiState) {
+    if (uiState is LoginUiState.Error) {
+        val errorState = uiState as LoginUiState.Error
+        errorState.errors?.forEach { detail ->
+            Text(
+                text = "• $detail",
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
             )
         }
     }

@@ -41,5 +41,12 @@ data class LoginResponse(
     }
 }
 
+sealed interface LoginUiState {
+    data object Idle : LoginUiState
+    data object Loading : LoginUiState
+    data class Succes(val username: String, val message: String) : LoginUiState
+    data class Error(val errors: List<String>? = null) : LoginUiState
+}
+
 
 
