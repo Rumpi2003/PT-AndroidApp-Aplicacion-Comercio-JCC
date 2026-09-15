@@ -1,6 +1,5 @@
 package com.proyectotitulo.appcomerciojcc.ui.login
 
-import android.widget.Button
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,12 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import java.nio.file.WatchEvent
 import androidx.compose.material3.CircularProgressIndicator
 import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel, modifier: Modifier = Modifier){
+fun LoginScreen(
+    viewModel: LoginViewModel,
+    onNavigateToRegister: () -> Unit,
+    modifier: Modifier = Modifier){
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -51,13 +51,19 @@ fun LoginScreen(viewModel: LoginViewModel, modifier: Modifier = Modifier){
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             vArrangement = Arrangement.Center,
             hAlignment = Alignment.CenterHorizontally,
-            viewModel)
+            viewModel = viewModel,
+            onNavigateToRegister = onNavigateToRegister
+        )
     }
 }
 
 @Composable
-fun Login(modifier: Modifier, vArrangement: Arrangement.Vertical, hAlignment: Alignment.Horizontal,
-    viewModel: LoginViewModel) {
+fun Login(
+    modifier: Modifier,
+    vArrangement: Arrangement.Vertical,
+    hAlignment: Alignment.Horizontal,
+    viewModel: LoginViewModel,
+    onNavigateToRegister: () -> Unit) {
 
     val email: String by viewModel.email.observeAsState(initial = "")
     val password: String by viewModel.password.observeAsState(initial = "")
@@ -81,7 +87,7 @@ fun Login(modifier: Modifier, vArrangement: Arrangement.Vertical, hAlignment: Al
         Spacer(modifier = Modifier.height(24.dp))
         LoginButton(loginEnable, isLoading) {viewModel.onLoginSelected()}
         Spacer(modifier = Modifier.height(16.dp))
-        RegisterButton()
+        GoToRegisterButton(onNavigateToRegister)
     }
 }
 
@@ -202,7 +208,7 @@ fun LoginButton(loginEnable: Boolean, isloading: Boolean, onLoginSelected: () ->
         onClick = { onLoginSelected() },
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp),
+            .height(48.dp),
         shape = MaterialTheme.shapes.medium,
         enabled = loginEnable && !isloading
     ) {
@@ -222,7 +228,7 @@ fun LoginButton(loginEnable: Boolean, isloading: Boolean, onLoginSelected: () ->
 }
 
 @Composable
-fun RegisterButton() {
+fun GoToRegisterButton(onNavigateToRegister: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -231,7 +237,7 @@ fun RegisterButton() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        TextButton(onClick = { /* Pasar a la RegisterScreen */ }) {
+        TextButton(onClick = { onNavigateToRegister() }) {
             Text(
                 text = "Regístrate",
                 style = MaterialTheme.typography.labelLarge,

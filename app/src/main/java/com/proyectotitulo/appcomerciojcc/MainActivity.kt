@@ -7,12 +7,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.proyectotitulo.appcomerciojcc.ui.login.LoginScreen
 import com.proyectotitulo.appcomerciojcc.ui.login.LoginViewModel
+import com.proyectotitulo.appcomerciojcc.ui.navigation.LoginRoute
+import com.proyectotitulo.appcomerciojcc.ui.navigation.RegisterRoute
+import com.proyectotitulo.appcomerciojcc.ui.register.RegisterScreen
+import com.proyectotitulo.appcomerciojcc.ui.register.RegisterViewModel
 import com.proyectotitulo.appcomerciojcc.ui.theme.AppComercioJCCTheme
 
 class MainActivity : ComponentActivity() {
@@ -21,9 +26,34 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AppComercioJCCTheme {
+                val navController = rememberNavController()
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LoginScreen(LoginViewModel(),
-                        modifier = Modifier.padding(innerPadding))
+                    NavHost(
+                        navController = navController,
+                        startDestination = LoginRoute,
+                        modifier = Modifier.padding(innerPadding)
+                    ) {
+                        composable<LoginRoute> {
+                            val loginViewModel: LoginViewModel = viewModel()
+                            LoginScreen(
+                                viewModel = loginViewModel,
+                                onNavigateToRegister = {
+                                    navController.navigate(RegisterRoute)
+                                }
+                            )
+                        }
+
+                        composable<RegisterRoute> {
+                            val registerViewModel: RegisterViewModel = viewModel()
+                            RegisterScreen(
+                                viewModel = registerViewModel,
+                                onBackToLogin = {
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

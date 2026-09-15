@@ -27,15 +27,12 @@ class LoginViewModel : ViewModel() {
     fun onTextFieldChanged(email: String, password: String) {
         _email.value = email
         _password.value = password
-        _loginEnable.value = isValidEmail(email) && isValidPassword(password)
+        _loginEnable.value = email.isNotEmpty() && password.isNotEmpty()
 
         if (_uiState.value is LoginUiState.Error) {
             _uiState.value = LoginUiState.Idle
         }
     }
-
-    private fun isValidEmail(email: String): Boolean = Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    private fun isValidPassword(password: String): Boolean = password.length >= 8
 
     fun onLoginSelected() {
         val currentEmail = email.value.orEmpty()
