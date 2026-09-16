@@ -4,15 +4,23 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LoginRequest(
+data class RegisterRequest(
     @SerialName("correo")
     val email: String,
     @SerialName("contraseña")
-    val password: String
+    val password: String,
+    @SerialName("nombre_usuario")
+    val username: String,
+    @SerialName("contacto")
+    val contact: String,
+    @SerialName("descripcion_perfil")
+    val profileDescription: String,
+    @SerialName("id_comuna")
+    val communeId: Int
 )
 
 @Serializable
-data class LoginResponse(
+data class RegisterResponse(
     @SerialName("status")
     val status: String,
     @SerialName("message")
@@ -41,12 +49,9 @@ data class LoginResponse(
     }
 }
 
-sealed interface LoginUiState {
-    data object Idle : LoginUiState
-    data object Loading : LoginUiState
-    data class Success(val username: String, val message: String) : LoginUiState
-    data class Error(val errors: List<String>? = null) : LoginUiState
+sealed interface RegisterUiState {
+    data object Idle : RegisterUiState
+    data object Loading : RegisterUiState
+    data class Success(val username: String, val message: String) : RegisterUiState
+    data class Error(val errors: List<String>? = null) : RegisterUiState
 }
-
-
-

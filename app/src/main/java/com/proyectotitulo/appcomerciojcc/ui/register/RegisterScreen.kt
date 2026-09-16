@@ -1,6 +1,5 @@
 package com.proyectotitulo.appcomerciojcc.ui.register
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -18,9 +17,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.proyectotitulo.appcomerciojcc.domain.models.CommuneResponse.Commune
+import com.proyectotitulo.appcomerciojcc.domain.models.RegisterUiState
 
 @Composable
 fun RegisterScreen(
@@ -63,11 +62,13 @@ fun Register(
     val password: String by viewModel.password.observeAsState(initial = "")
     val confirmPassword by viewModel.confirmPassword.observeAsState(initial = "")
     val contact by viewModel.contact.observeAsState(initial = "")
-    val commune by viewModel.commune.observeAsState(initial = 0)
+    val communeId by viewModel.communeId.observeAsState(initial = 0)
     val communesList: List<Commune> by viewModel.communesList.observeAsState(initial = emptyList())
     val selectedCommuneName: String by viewModel.selectedCommuneName.observeAsState(initial = "")
     val profileDescription by viewModel.profileDescription.observeAsState(initial = "")
     val registerEnable by viewModel.registerEnable.observeAsState(initial = false)
+    val uiState by viewModel.uiState.observeAsState(initial = RegisterUiState.Idle)
+    val isLoading = uiState is RegisterUiState.Loading
 
     Column(
         modifier = modifier,
@@ -76,26 +77,38 @@ fun Register(
     ) {
         Header()
         Spacer(modifier = Modifier.height(24.dp))
-        EmailField(email) { viewModel.onFieldChanged(it, username, password, confirmPassword,
-            contact, commune, profileDescription)}
+        EmailField(email, !isLoading) { viewModel.onFieldChanged(it, username, password, confirmPassword,
+            contact, communeId, profileDescription)}
         Spacer(modifier = Modifier.height(16.dp))
-        UsernameField()
+        UsernameField(username, !isLoading) { viewModel.onFieldChanged(email, it, password, confirmPassword,
+            contact, communeId, profileDescription)}
         Spacer(modifier = Modifier.height(16.dp))
-        PasswordField()
+        PasswordField(password, !isLoading) { viewModel.onFieldChanged(email, username, it, confirmPassword,
+            contact, communeId, profileDescription)}
         Spacer(modifier = Modifier.height(16.dp))
-        ConfirmPasswordField()
+        ConfirmPasswordField(confirmPassword, !isLoading) { viewModel.onFieldChanged(email, username, password, it,
+            contact, communeId, profileDescription)}
         Spacer(modifier = Modifier.height(16.dp))
-        PhoneNumberField()
+        PhoneNumberField(contact, !isLoading) { viewModel.onFieldChanged(email, username, password, confirmPassword,
+            it, communeId, profileDescription)}
         Spacer(modifier = Modifier.height(16.dp))
         CommuneField(
             selectedCommuneName = selectedCommuneName,
             communesList = communesList,
+            enabled = !isLoading,
             onCommuneSelected = { viewModel.onCommuneSelected(it) }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        ProfileDescriptionField()
+        ProfileDescriptionField(profileDescription, !isLoading) { viewModel.onFieldChanged(email, username, password, confirmPassword,
+            contact, communeId, it)}
+        Spacer(modifier = Modifier.height(16.dp))
+        ErrorMessage(uiState)
         Spacer(modifier = Modifier.height(24.dp))
-        RegisterButton(registerEnable)
+        RegisterButton(
+            registerEnable = registerEnable,
+            isLoading = isLoading,
+            onRegisterSelected = { viewModel.onRegisterSelected() }
+        )
         Spacer(modifier = Modifier.height(12.dp))
         BackToLoginButton(onBackToLogin)
 
@@ -120,7 +133,7 @@ fun Header() {
 }
 
 @Composable
-fun EmailField(email: String, onTextFieldChanged: (String) -> Unit) {
+fun EmailField(email: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
     val maxChar = 255
 
@@ -142,15 +155,19 @@ fun EmailField(email: String, onTextFieldChanged: (String) -> Unit) {
         ),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled
     )
 }
 
 @Composable
-fun UsernameField() {
+fun UsernameField(username: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
+
+    val maxChar = 32
+
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = username,
+        onValueChange = { if (it.length <= maxChar) onTextFieldChanged(it) },
         label = { Text("Nombre de usuario*")},
         leadingIcon = {
             Icon(
@@ -165,18 +182,20 @@ fun UsernameField() {
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled
     )
 }
 
 @Composable
-fun PasswordField() {
+fun PasswordField(password: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var maxChar = 64
 
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = password,
+        onValueChange = { if (it.length <= maxChar) onTextFieldChanged(it) },
         label = { Text("Contraseña*") },
         leadingIcon = {
             Icon(
@@ -204,6 +223,7 @@ fun PasswordField() {
         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
+        enabled = enabled
     )
     Spacer(modifier = Modifier.height(4.dp))
     Text(
@@ -223,13 +243,14 @@ fun PasswordField() {
 }
 
 @Composable
-fun ConfirmPasswordField() {
+fun ConfirmPasswordField(confirmPassword: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
+    var maxChar = 64
 
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = confirmPassword,
+        onValueChange = { if (it.length <= maxChar) onTextFieldChanged(it) },
         label = { Text("Confirmar Contraseña*") },
         leadingIcon = {
             Icon(
@@ -257,14 +278,18 @@ fun ConfirmPasswordField() {
         visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
+        enabled = enabled
     )
 }
 
 @Composable
-fun PhoneNumberField() {
+fun PhoneNumberField(contact: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
+
+    var maxChar = 12
+
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = contact,
+        onValueChange = { if (it.length <= maxChar) onTextFieldChanged(it) },
         label = { Text("Teléfono Contacto") },
         leadingIcon = {
             Icon(
@@ -274,7 +299,8 @@ fun PhoneNumberField() {
         },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled
     )
 }
 
@@ -283,6 +309,7 @@ fun PhoneNumberField() {
 fun CommuneField(
     selectedCommuneName: String,
     communesList: List<Commune>,
+    enabled: Boolean,
     onCommuneSelected: (Commune) -> Unit
 ) {
     var expandedCommune by remember { mutableStateOf(false) }
@@ -316,7 +343,8 @@ fun CommuneField(
             ),
             modifier = Modifier
                 .menuAnchor()
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            enabled = enabled
         )
 
         ExposedDropdownMenu(
@@ -337,11 +365,21 @@ fun CommuneField(
 }
 
 @Composable
-fun ProfileDescriptionField() {
+fun ProfileDescriptionField(profileDescription: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
+
+    var maxChar = 255
+
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = profileDescription,
+        onValueChange = { if (it.length <= maxChar) onTextFieldChanged(it) },
         label = { Text("Descripción del perfil")},
+        supportingText = {
+            Text(
+                text = "${profileDescription.length} / $maxChar",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End
+            )
+        },
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Info,
@@ -356,21 +394,42 @@ fun ProfileDescriptionField() {
         ),
         minLines = 3,
         maxLines = 5,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
+        isError = profileDescription.length >= maxChar
     )
 }
 
 @Composable
-fun RegisterButton(registerEnable: Boolean) {
+fun ErrorMessage(uiState: RegisterUiState) {
+    if (uiState is RegisterUiState.Error) {
+        val errorState = uiState as RegisterUiState.Error
+        errorState.errors?.forEach { detail ->
+            Text(
+                text = "• $detail",
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+@Composable
+fun RegisterButton(
+    registerEnable: Boolean,
+    isLoading: Boolean,
+    onRegisterSelected: () -> Unit
+) {
     Button(
-        onClick = {  },
+        onClick = { onRegisterSelected() },
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp),
         shape = MaterialTheme.shapes.medium,
-        enabled = registerEnable
+        enabled = registerEnable && !isLoading
     ) {
-        if (false) {
+        if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
                 color = MaterialTheme.colorScheme.onPrimary,

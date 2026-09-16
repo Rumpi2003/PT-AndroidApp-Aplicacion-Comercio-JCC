@@ -1,12 +1,12 @@
 package com.proyectotitulo.appcomerciojcc.ui.login
 
-import android.util.Patterns
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.proyectotitulo.appcomerciojcc.data.repository.LoginRepository
 import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
+import com.proyectotitulo.appcomerciojcc.domain.models.RegisterUiState
 import kotlinx.coroutines.launch
 class LoginViewModel : ViewModel() {
 
@@ -46,13 +46,19 @@ class LoginViewModel : ViewModel() {
             result.onSuccess { response ->
                 if (response.status == "success") {
                     val username = response.data?.user?.username.orEmpty()
-                    _uiState.value = LoginUiState.Succes(username, response.message)
+                    _uiState.value = LoginUiState.Success(
+                        username = username,
+                        message = response.message
+                    )
                 } else {
-                    _uiState.value = LoginUiState.Error(response.errors)
+                    _uiState.value = LoginUiState.Error(
+                        errors = response.errors ?: listOf(response.message)
+                    )
                 }
             }.onFailure { error ->
-                val errors = listOf<String>(error.message?: "Error de red inesperado")
-                _uiState.value = LoginUiState.Error(errors)
+                _uiState.value = LoginUiState.Error(
+                    errors = listOf(error.message ?: "Error de red inesperado")
+                )
             }
         }
     }
