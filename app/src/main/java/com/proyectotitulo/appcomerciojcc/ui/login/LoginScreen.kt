@@ -34,12 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.proyectotitulo.appcomerciojcc.data.local.SessionManager
 import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
     onNavigateToRegister: () -> Unit,
+    onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier){
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -52,6 +56,7 @@ fun LoginScreen(
             vArrangement = Arrangement.Center,
             hAlignment = Alignment.CenterHorizontally,
             viewModel = viewModel,
+            onLoginSuccess = onLoginSuccess,
             onNavigateToRegister = onNavigateToRegister
         )
     }
@@ -63,6 +68,7 @@ fun Login(
     vArrangement: Arrangement.Vertical,
     hAlignment: Alignment.Horizontal,
     viewModel: LoginViewModel,
+    onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit) {
 
     val email: String by viewModel.email.observeAsState(initial = "")
@@ -70,6 +76,14 @@ fun Login(
     val loginEnable: Boolean by viewModel.loginEnable.observeAsState(initial = false)
     val uiState: LoginUiState by viewModel.uiState.observeAsState(initial = LoginUiState.Idle)
     val isLoading = uiState is LoginUiState.Loading
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+
+    LaunchedEffect(uiState) {
+        if (uiState is LoginUiState.Success) {
+            onLoginSuccess()
+        }
+    }
 
     Column(
         modifier = modifier,
@@ -85,7 +99,7 @@ fun Login(
         Spacer(modifier = Modifier.height(16.dp))
         ErrorMessage(uiState)
         Spacer(modifier = Modifier.height(24.dp))
-        LoginButton(loginEnable, isLoading) {viewModel.onLoginSelected()}
+        LoginButton(loginEnable, isLoading) { viewModel.onLoginSelected(sessionManager) }
         Spacer(modifier = Modifier.height(16.dp))
         GoToRegisterButton(onNavigateToRegister)
     }

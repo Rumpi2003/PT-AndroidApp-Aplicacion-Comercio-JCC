@@ -1,5 +1,6 @@
 package com.proyectotitulo.appcomerciojcc.ui.register
 
+import android.os.Message
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -70,50 +71,80 @@ fun Register(
     val uiState by viewModel.uiState.observeAsState(initial = RegisterUiState.Idle)
     val isLoading = uiState is RegisterUiState.Loading
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = vArrangement,
-        horizontalAlignment = hAlignment
-    ) {
-        Header()
-        Spacer(modifier = Modifier.height(24.dp))
-        EmailField(email, !isLoading) { viewModel.onFieldChanged(it, username, password, confirmPassword,
-            contact, communeId, profileDescription)}
-        Spacer(modifier = Modifier.height(16.dp))
-        UsernameField(username, !isLoading) { viewModel.onFieldChanged(email, it, password, confirmPassword,
-            contact, communeId, profileDescription)}
-        Spacer(modifier = Modifier.height(16.dp))
-        PasswordField(password, !isLoading) { viewModel.onFieldChanged(email, username, it, confirmPassword,
-            contact, communeId, profileDescription)}
-        Spacer(modifier = Modifier.height(16.dp))
-        ConfirmPasswordField(confirmPassword, !isLoading) { viewModel.onFieldChanged(email, username, password, it,
-            contact, communeId, profileDescription)}
-        Spacer(modifier = Modifier.height(16.dp))
-        PhoneNumberField(contact, !isLoading) { viewModel.onFieldChanged(email, username, password, confirmPassword,
-            it, communeId, profileDescription)}
-        Spacer(modifier = Modifier.height(16.dp))
-        CommuneField(
-            selectedCommuneName = selectedCommuneName,
-            communesList = communesList,
-            enabled = !isLoading,
-            onCommuneSelected = { viewModel.onCommuneSelected(it) }
+    if (uiState is RegisterUiState.Success) {
+        val successState = uiState as RegisterUiState.Success
+        SuccessContent(
+            message = successState.message,
+            onBackToLogin = onBackToLogin
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        ProfileDescriptionField(profileDescription, !isLoading) { viewModel.onFieldChanged(email, username, password, confirmPassword,
-            contact, communeId, it)}
-        Spacer(modifier = Modifier.height(16.dp))
-        ErrorMessage(uiState)
-        Spacer(modifier = Modifier.height(24.dp))
-        RegisterButton(
-            registerEnable = registerEnable,
-            isLoading = isLoading,
-            onRegisterSelected = { viewModel.onRegisterSelected() }
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        BackToLoginButton(onBackToLogin)
+    } else {
 
-
-
+        Column(
+            modifier = modifier,
+            verticalArrangement = vArrangement,
+            horizontalAlignment = hAlignment
+        ) {
+            Header()
+            Spacer(modifier = Modifier.height(24.dp))
+            EmailField(email, !isLoading) {
+                viewModel.onFieldChanged(
+                    it, username, password, confirmPassword,
+                    contact, communeId, profileDescription
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            UsernameField(username, !isLoading) {
+                viewModel.onFieldChanged(
+                    email, it, password, confirmPassword,
+                    contact, communeId, profileDescription
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            PasswordField(password, !isLoading) {
+                viewModel.onFieldChanged(
+                    email, username, it, confirmPassword,
+                    contact, communeId, profileDescription
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            ConfirmPasswordField(confirmPassword, !isLoading) {
+                viewModel.onFieldChanged(
+                    email, username, password, it,
+                    contact, communeId, profileDescription
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            PhoneNumberField(contact, !isLoading) {
+                viewModel.onFieldChanged(
+                    email, username, password, confirmPassword,
+                    it, communeId, profileDescription
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            CommuneField(
+                selectedCommuneName = selectedCommuneName,
+                communesList = communesList,
+                enabled = !isLoading,
+                onCommuneSelected = { viewModel.onCommuneSelected(it) }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ProfileDescriptionField(profileDescription, !isLoading) {
+                viewModel.onFieldChanged(
+                    email, username, password, confirmPassword,
+                    contact, communeId, it
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            ErrorMessage(uiState)
+            Spacer(modifier = Modifier.height(24.dp))
+            RegisterButton(
+                registerEnable = registerEnable,
+                isLoading = isLoading,
+                onRegisterSelected = { viewModel.onRegisterSelected() }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            BackToLoginButton(onBackToLogin)
+        }
     }
 }
 
@@ -191,7 +222,7 @@ fun UsernameField(username: String, enabled: Boolean, onTextFieldChanged: (Strin
 fun PasswordField(password: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var maxChar = 64
+    val maxChar = 64
 
     OutlinedTextField(
         value = password,
@@ -246,7 +277,7 @@ fun PasswordField(password: String, enabled: Boolean, onTextFieldChanged: (Strin
 fun ConfirmPasswordField(confirmPassword: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
-    var maxChar = 64
+    val maxChar = 64
 
     OutlinedTextField(
         value = confirmPassword,
@@ -285,7 +316,7 @@ fun ConfirmPasswordField(confirmPassword: String, enabled: Boolean, onTextFieldC
 @Composable
 fun PhoneNumberField(contact: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
-    var maxChar = 12
+    val maxChar = 12
 
     OutlinedTextField(
         value = contact,
@@ -367,7 +398,7 @@ fun CommuneField(
 @Composable
 fun ProfileDescriptionField(profileDescription: String, enabled: Boolean, onTextFieldChanged: (String) -> Unit) {
 
-    var maxChar = 255
+    val maxChar = 255
 
     OutlinedTextField(
         value = profileDescription,
@@ -462,4 +493,43 @@ fun BackToLoginButton(onBackToLogin: () -> Unit) {
             )
         }
     }
+}
+
+@Composable
+fun SuccessContent(
+    message: String,
+    onBackToLogin: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(100.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(
+            onClick = { onBackToLogin() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Text("Volver al Inicio de Sesión")
+        }
+    }
+
 }

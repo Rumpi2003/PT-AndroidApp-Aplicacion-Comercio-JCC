@@ -4,6 +4,8 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.proyectotitulo.appcomerciojcc.data.local.SessionManager
+import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.data.repository.LoginRepository
 import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 import com.proyectotitulo.appcomerciojcc.domain.models.RegisterUiState
@@ -34,7 +36,7 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    fun onLoginSelected() {
+    fun onLoginSelected(sessionManager: SessionManager) {
         val currentEmail = email.value.orEmpty()
         val currentPassword = password.value.orEmpty()
 
@@ -45,7 +47,11 @@ class LoginViewModel : ViewModel() {
 
             result.onSuccess { response ->
                 if (response.status == "success") {
+                    val token = response.data?.token.orEmpty()
                     val username = response.data?.user?.username.orEmpty()
+
+                    sessionManager.saveToken(token)
+                    KtorApiClient.token = token
                     _uiState.value = LoginUiState.Success(
                         username = username,
                         message = response.message
