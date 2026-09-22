@@ -33,6 +33,7 @@ import com.proyectotitulo.appcomerciojcc.ui.navigation.ProfileRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.SearchRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.TradeRoute
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileScreen
+import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileViewModel
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchScreen
 import com.proyectotitulo.appcomerciojcc.ui.trade.TradeScreen
 
@@ -112,7 +113,10 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<ProfileRoute> {
-                            ProfileScreen()
+                            val profileViewModel: ProfileViewModel = viewModel()
+                            ProfileScreen(
+                                viewModel = profileViewModel
+                            )
                         }
                     }
                 }

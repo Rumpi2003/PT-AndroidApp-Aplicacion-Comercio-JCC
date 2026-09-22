@@ -5,6 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.sql.Timestamp
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
@@ -44,11 +45,10 @@ data class PrivateProfileResponse(
     ) {
         val formattedRegisterDate: String
             get() = try {
-                val inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS", Locale.getDefault())
+                val zonedDateTime = ZonedDateTime.parse(registerDate)
                 val outputFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
 
-                val parsedDate = LocalDateTime.parse(registerDate, inputFormatter)
-                parsedDate.format(outputFormatter)
+                zonedDateTime.format(outputFormatter)
             } catch (e: Exception) {
                 registerDate
             }
@@ -84,4 +84,10 @@ data class CommuneResponse(
         @SerialName("region")
         val region: String,
     )
+}
+
+sealed interface ProfileUiState {
+    data object Loading : ProfileUiState
+    data class Success(val profileData: PrivateProfileResponse.Profile) : ProfileUiState
+    data class Error(val errors: List<String>? = null) : ProfileUiState
 }

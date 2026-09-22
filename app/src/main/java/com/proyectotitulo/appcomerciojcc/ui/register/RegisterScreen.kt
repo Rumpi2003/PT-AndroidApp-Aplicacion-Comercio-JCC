@@ -28,12 +28,8 @@ fun RegisterScreen(
     onBackToLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-
-    val scrollState = rememberScrollState()
-
     Surface(
-        modifier = modifier.fillMaxSize()
-            .verticalScroll(scrollState),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Register(
@@ -79,8 +75,10 @@ fun Register(
         )
     } else {
 
+        val scrollState = rememberScrollState()
+
         Column(
-            modifier = modifier,
+            modifier = modifier.verticalScroll(scrollState),
             verticalArrangement = vArrangement,
             horizontalAlignment = hAlignment
         ) {
