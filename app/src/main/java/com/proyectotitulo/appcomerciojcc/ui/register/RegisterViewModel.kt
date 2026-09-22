@@ -58,8 +58,16 @@ class RegisterViewModel : ViewModel() {
             result.onSuccess { response ->
                 if (response.status == "success") {
                     _communesList.value = response.data ?: emptyList()
+                } else {
+                    _uiState.value = RegisterUiState.Error(
+                        errors = response.errors ?: listOf(response.message)
+                    )
                 }
-            }.onFailure { }
+            }.onFailure {error ->
+                _uiState.value = RegisterUiState.Error(
+                    errors = listOf(error.message ?: "Error de red inesperado")
+                )
+            }
         }
     }
 
