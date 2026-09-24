@@ -6,8 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.proyectotitulo.appcomerciojcc.data.repository.ProfileRepository
 import com.proyectotitulo.appcomerciojcc.data.repository.RegisterRepository
-import com.proyectotitulo.appcomerciojcc.domain.models.CommuneResponse.Commune
-import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
+import com.proyectotitulo.appcomerciojcc.domain.models.GetCommuneResponse.Commune
 import com.proyectotitulo.appcomerciojcc.domain.models.RegisterUiState
 import kotlinx.coroutines.launch
 

@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import com.proyectotitulo.appcomerciojcc.data.local.SessionManager
 import com.proyectotitulo.appcomerciojcc.domain.models.LoginUiState
 
@@ -78,6 +82,7 @@ fun Login(
     val isLoading = uiState is LoginUiState.Loading
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
@@ -85,23 +90,30 @@ fun Login(
         }
     }
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = vArrangement,
-        horizontalAlignment = hAlignment
+    Box(
+        modifier = modifier.imePadding(),
+        contentAlignment = Alignment.Center
     ) {
-        Header()
-        Spacer(modifier = Modifier.height(32.dp))
-        EmailField(email, enabled = !isLoading) { viewModel.onTextFieldChanged(it, password) }
-        Spacer(modifier = Modifier.height(16.dp))
-        PasswordField(password, enabled = !isLoading) { viewModel.onTextFieldChanged(email, it) }
-        ForgotPassword()
-        Spacer(modifier = Modifier.height(16.dp))
-        ErrorMessage(uiState)
-        Spacer(modifier = Modifier.height(24.dp))
-        LoginButton(loginEnable, isLoading) { viewModel.onLoginSelected(sessionManager) }
-        Spacer(modifier = Modifier.height(16.dp))
-        GoToRegisterButton(onNavigateToRegister)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+            verticalArrangement = vArrangement,
+            horizontalAlignment = hAlignment
+        ) {
+            Header()
+            Spacer(modifier = Modifier.height(32.dp))
+            EmailField(email, enabled = !isLoading) { viewModel.onTextFieldChanged(it, password) }
+            Spacer(modifier = Modifier.height(16.dp))
+            PasswordField(password, enabled = !isLoading) { viewModel.onTextFieldChanged(email, it) }
+            ForgotPassword()
+            Spacer(modifier = Modifier.height(16.dp))
+            ErrorMessage(uiState)
+            Spacer(modifier = Modifier.height(24.dp))
+            LoginButton(loginEnable, isLoading) { viewModel.onLoginSelected(sessionManager) }
+            Spacer(modifier = Modifier.height(16.dp))
+            GoToRegisterButton(onNavigateToRegister)
+        }
     }
 }
 
@@ -138,7 +150,10 @@ fun EmailField(email: String, enabled: Boolean, onTextFieldChanged: (String) -> 
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Next
+        ),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
@@ -177,7 +192,10 @@ fun PasswordField(password: String,enabled: Boolean, onTextFieldChanged: (String
         ),
         singleLine = true,
         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Done
+        ),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )

@@ -1,18 +1,14 @@
 package com.proyectotitulo.appcomerciojcc.domain.models
 
-import android.provider.ContactsContract
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateDescriptionResponse.ProfileDescription
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.sql.Timestamp
-import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Date
 import java.util.Locale
-import kotlin.time.Instant
 
 @Serializable
-data class PrivateProfileResponse(
+data class GetPrivateProfileResponse(
     @SerialName("status")
     val status: String,
     @SerialName("message")
@@ -65,7 +61,7 @@ data class PrivateProfileResponse(
 }
 
 @Serializable
-data class CommuneResponse(
+data class GetCommuneResponse(
     @SerialName("status")
     val status: String,
     @SerialName("message")
@@ -86,8 +82,60 @@ data class CommuneResponse(
     )
 }
 
+@Serializable
+data class UpdateDescriptionRequest(
+    @SerialName("descripcion_perfil")
+    val profileDescription: String
+)
+
+@Serializable
+data class UpdateDescriptionResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: ProfileDescription,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class ProfileDescription(
+        @SerialName("descripcion_perfil")
+        val profileDescription: String
+    )
+}
+
+@Serializable
+data class UpdateCommuneRequest(
+    @SerialName("id_comuna")
+    val communeId: Int
+)
+
+@Serializable
+data class UpdateCommuneResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: Commune,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Commune(
+        @SerialName("id_comuna")
+        val communeId: Int,
+        @SerialName("nombre_comuna")
+        val communeName: String,
+        @SerialName("region")
+        val region: String,
+    )
+}
+
 sealed interface ProfileUiState {
     data object Loading : ProfileUiState
-    data class Success(val profileData: PrivateProfileResponse.Profile) : ProfileUiState
+    data class Success(val profileData: GetPrivateProfileResponse.Profile) : ProfileUiState
     data class Error(val errors: List<String>? = null) : ProfileUiState
 }

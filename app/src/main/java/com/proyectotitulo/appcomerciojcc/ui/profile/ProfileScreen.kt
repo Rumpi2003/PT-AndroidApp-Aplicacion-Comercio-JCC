@@ -20,13 +20,14 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.HomeWork
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarOutline
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,19 +35,26 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.proyectotitulo.appcomerciojcc.domain.models.PrivateProfileResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.ProfileUiState
 
 @Composable
@@ -56,6 +64,7 @@ fun ProfileScreen(
 ) {
 
     val uiState by viewModel.uiState.observeAsState(initial = ProfileUiState.Loading)
+    var showEditDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -77,8 +86,19 @@ fun ProfileScreen(
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     vArrangement = Arrangement.spacedBy(12.dp),
                     hAlignment = Alignment.CenterHorizontally,
-                    profile = state.profileData
+                    profile = state.profileData,
+                    onEditDescriptionClick = { showEditDialog = true }
                 )
+
+                if (showEditDialog) {
+                    EditDescriptionDialog(
+                        initialDescription = state.profileData.profileDescription,
+                        onDismissRequest = { showEditDialog = false },
+                        onConfirm = { newDesc, onComplete ->
+                            viewModel.updateDescription(newDesc, onComplete)
+                        }
+                    )
+                }
             }
             is ProfileUiState.Error -> {
                 Box(
@@ -106,7 +126,8 @@ fun Profile(
     modifier: Modifier,
     vArrangement: Arrangement.Vertical,
     hAlignment: Alignment.Horizontal,
-    profile: PrivateProfileResponse.Profile
+    profile: GetPrivateProfileResponse.Profile,
+    onEditDescriptionClick: () -> Unit
 ) {
     Column(
         modifier = modifier,
@@ -118,7 +139,8 @@ fun Profile(
             averageScore = profile.averageScore
         )
         DescriptionCard(
-            description = profile.profileDescription
+            description = profile.profileDescription,
+            onEditClick = onEditDescriptionClick
         )
         ContactInfoCard(
             email = profile.email,
@@ -136,6 +158,9 @@ fun Profile(
             label = "RADIO GEOLOCALIZACIÓN",
             value = "${profile.geoRadius / 1000} km",
             buttonText = "Cambiar"
+        )
+        VisibilityCard(
+            isPublic = profile.profileVisibility
         )
     }
 }
@@ -219,7 +244,9 @@ fun HeaderProfileCard(
 }
 
 @Composable
-fun DescriptionCard(description: String) {
+fun DescriptionCard(
+    description: String,
+    onEditClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -238,7 +265,7 @@ fun DescriptionCard(description: String) {
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Button(
-                    onClick = {},
+                    onClick = onEditClick,
                     shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -258,12 +285,114 @@ fun DescriptionCard(description: String) {
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = description,
+                text = description.ifEmpty { "Sin descripción" },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
     }
+}
+
+@Composable
+fun EditDescriptionDialog(
+    initialDescription: String,
+    onDismissRequest: () -> Unit,
+    onConfirm: (String, (Boolean, String?) -> Unit) -> Unit
+) {
+    var descriptionText by remember { mutableStateOf(initialDescription) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val maxChar = 255
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismissRequest() },
+        title = {
+            Text(
+                text = "Editar descripción",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = descriptionText,
+                    onValueChange = {
+                        if (it.length <= maxChar) {
+                            descriptionText = it
+                        }
+                    },
+                    label = { Text("Descripción del perfil") },
+                    supportingText = {
+                        Text(
+                            text = "${descriptionText.length} / $maxChar",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Icono Descripción"
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    minLines = 3,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    isLoading = true
+                    errorMessage = null
+                    onConfirm(descriptionText) { success, error ->
+                        isLoading = false
+                        if (success) {
+                            onDismissRequest()
+                        } else {
+                            errorMessage = error
+                        }
+                    }
+                },
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Aceptar")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismissRequest,
+                enabled = !isLoading
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
+
 }
 
 @Composable
@@ -286,7 +415,7 @@ fun ContactInfoCard(email: String, contact: String, registerDate: String) {
             ProfileDetailItem(
                 icon = Icons.Default.Phone,
                 label = "CONTACTO",
-                value = contact
+                value = contact.ifEmpty { "Sin contacto" }
             )
             ProfileDetailItem(
                 icon = Icons.Default.CalendarToday,
@@ -376,6 +505,56 @@ fun SingleActionCard(
             ) {
                 Text(text = buttonText, style = MaterialTheme.typography.labelMedium)
             }
+        }
+    }
+}
+
+@Composable
+fun VisibilityCard(isPublic: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Visibilidad del perfil",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = if (isPublic) "Público - visible para todos" else "Privado",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+
+            Switch(
+                checked = isPublic,
+                onCheckedChange = {},
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.secondary
+                )
+            )
         }
     }
 }

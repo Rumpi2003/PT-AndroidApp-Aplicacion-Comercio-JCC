@@ -39,4 +39,29 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun updateDescription(newDescription: String, onResult: (Boolean, String?) -> Unit ) {
+        viewModelScope.launch {
+            val result = repository.updateProfileDescription(newDescription)
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val currentState = _uiState.value
+                    if (currentState is ProfileUiState.Success) {
+                        val updatedProfile = currentState.profileData.copy(
+                            profileDescription = response.data.profileDescription
+                        )
+                        _uiState.value = ProfileUiState.Success(updatedProfile)
+                    } else {
+                        loadProfile()
+                    }
+                    onResult(true, null)
+                } else {
+                    val errorMsg = response.errors?.firstOrNull() ?: response.message
+                    onResult(false, errorMsg)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al actualizar la descripción")
+            }
+        }
+    }
 }

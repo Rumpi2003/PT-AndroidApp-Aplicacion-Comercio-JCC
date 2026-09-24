@@ -1,6 +1,5 @@
 package com.proyectotitulo.appcomerciojcc.ui.register
 
-import android.os.Message
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -14,12 +13,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.proyectotitulo.appcomerciojcc.domain.models.CommuneResponse.Commune
+import com.proyectotitulo.appcomerciojcc.domain.models.GetCommuneResponse.Commune
 import com.proyectotitulo.appcomerciojcc.domain.models.RegisterUiState
 
 @Composable
@@ -78,7 +78,9 @@ fun Register(
         val scrollState = rememberScrollState()
 
         Column(
-            modifier = modifier.verticalScroll(scrollState),
+            modifier = modifier
+                .imePadding()
+                .verticalScroll(scrollState),
             verticalArrangement = vArrangement,
             horizontalAlignment = hAlignment
         ) {
@@ -183,7 +185,9 @@ fun EmailField(email: String, enabled: Boolean, onTextFieldChanged: (String) -> 
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Next),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
@@ -211,6 +215,7 @@ fun UsernameField(username: String, enabled: Boolean, onTextFieldChanged: (Strin
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
@@ -250,17 +255,17 @@ fun PasswordField(password: String, enabled: Boolean, onTextFieldChanged: (Strin
         ),
         singleLine = true,
         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Next
+        ),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
     Spacer(modifier = Modifier.height(4.dp))
     Text(
-        text = "Contraseña debe tener como mínimo:\n" +
-                "   -8 carácteres\n" +
-                "   -una letra minúscula y mayúscula\n" +
-                "   -un número\n" +
-                "   -un carácter especial",
+        text = "La contraseña debe tener como mínimo 8 caracteres, una letra minúscula" +
+                ", una letra mayúscula, un número y un carácter especial",
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Left,
@@ -305,7 +310,10 @@ fun ConfirmPasswordField(confirmPassword: String, enabled: Boolean, onTextFieldC
         ),
         singleLine = true,
         visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Next
+        ),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
@@ -327,7 +335,10 @@ fun PhoneNumberField(contact: String, enabled: Boolean, onTextFieldChanged: (Str
             )
         },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Phone,
+            imeAction = ImeAction.Next
+        ),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled
     )
@@ -423,6 +434,7 @@ fun ProfileDescriptionField(profileDescription: String, enabled: Boolean, onText
         ),
         minLines = 3,
         maxLines = 5,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
         isError = profileDescription.length >= maxChar
