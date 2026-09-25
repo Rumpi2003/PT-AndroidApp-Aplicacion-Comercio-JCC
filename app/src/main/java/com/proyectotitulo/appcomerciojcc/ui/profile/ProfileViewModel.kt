@@ -140,4 +140,30 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun updateProfileVisibility(newVisibility: Boolean, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.updateProfileVisibility(newVisibility)
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val currentState = _uiState.value
+                    if (currentState is ProfileUiState.Success) {
+                        val updatedVisibility = response.data?.profileVisibility ?: newVisibility
+                        val updatedProfile = currentState.profileData?.copy(
+                            profileVisibility = updatedVisibility
+                        )
+                        _uiState.value = ProfileUiState.Success(updatedProfile)
+                    } else {
+                        loadProfile()
+                    }
+                    onResult(true, null)
+                } else {
+                    val errorMsg = response.errors?.firstOrNull() ?: response.message
+                    onResult(false, errorMsg)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al actualizar la visibilidad del perfil")
+            }
+        }
+    }
 }

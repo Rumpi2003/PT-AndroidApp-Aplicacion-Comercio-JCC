@@ -110,7 +110,12 @@ fun ProfileScreen(
                             viewModel.loadCommunes()
                             showEditCommuneDialog = true
                         },
-                        onEditGeoRadiusClick = { showEditGeoRadiusDialog = true }
+                        onEditGeoRadiusClick = { showEditGeoRadiusDialog = true },
+                        onVisibilityChange = { newVisibility ->
+                            viewModel.updateProfileVisibility(newVisibility) { success, error ->
+
+                            }
+                        }
                     )
 
                     if (showEditDescriptionDialog) {
@@ -163,7 +168,8 @@ fun Profile(
     profile: GetPrivateProfileResponse.Profile,
     onEditDescriptionClick: () -> Unit,
     onEditCommuneClick: () -> Unit,
-    onEditGeoRadiusClick: () -> Unit
+    onEditGeoRadiusClick: () -> Unit,
+    onVisibilityChange: (Boolean) -> Unit
 ) {
     Column(
         modifier = modifier,
@@ -198,7 +204,8 @@ fun Profile(
             onEditClick = onEditGeoRadiusClick
         )
         VisibilityCard(
-            isPublic = profile.profileVisibility ?: false
+            isPublic = profile.profileVisibility ?: false,
+            onVisibilityChange = onVisibilityChange
         )
     }
 }
@@ -491,7 +498,10 @@ fun SingleActionCard(
 }
 
 @Composable
-fun VisibilityCard(isPublic: Boolean) {
+fun VisibilityCard(
+    isPublic: Boolean,
+    enabled: Boolean = true,
+    onVisibilityChange: (Boolean) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -529,7 +539,8 @@ fun VisibilityCard(isPublic: Boolean) {
 
             Switch(
                 checked = isPublic,
-                onCheckedChange = {},
+                enabled = enabled,
+                onCheckedChange = onVisibilityChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
