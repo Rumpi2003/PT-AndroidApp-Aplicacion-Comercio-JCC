@@ -37,6 +37,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.material3)
     val ktorVersion = "2.3.10"
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-okhttp:$ktorVersion")

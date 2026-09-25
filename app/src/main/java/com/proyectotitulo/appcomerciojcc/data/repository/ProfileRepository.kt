@@ -7,6 +7,10 @@ import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateDescriptionRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateDescriptionResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateGeoRadiusRequest
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateGeoRadiusResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityRequest
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityResponse
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.put
@@ -53,7 +57,7 @@ class ProfileRepository {
         }
     }
 
-    suspend fun updateCommune(communeId: Int): Result<UpdateCommuneResponse> {
+    suspend fun updateCommune(communeId: Int?): Result<UpdateCommuneResponse> {
         return try {
             val response: UpdateCommuneResponse = client.put("${KtorApiClient.BASE_URL}/usuarios/comuna") {
                 contentType(ContentType.Application.Json)
@@ -66,4 +70,33 @@ class ProfileRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun updateGeoRadius(geoRadius: Int): Result<UpdateGeoRadiusResponse> {
+        return try {
+            val response: UpdateGeoRadiusResponse = client.put("${KtorApiClient.BASE_URL}/usuarios/radio_geo") {
+                contentType(ContentType.Application.Json)
+                setBody(UpdateGeoRadiusRequest(geoRadius))
+            }.body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateProfileVisibility(profileVisibility: Boolean): Result<UpdateVisibilityResponse> {
+        return try {
+            val response: UpdateVisibilityResponse = client.put("${KtorApiClient.BASE_URL}/usuarios/visibilidad_perfil") {
+                contentType(ContentType.Application.Json)
+                setBody(UpdateVisibilityRequest(profileVisibility))
+            }.body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
 }
+
