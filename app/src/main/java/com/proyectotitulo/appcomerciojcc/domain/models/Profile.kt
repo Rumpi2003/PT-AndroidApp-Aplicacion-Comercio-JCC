@@ -146,7 +146,7 @@ data class UpdateGeoRadiusResponse(
     @SerialName("message")
     val message: String,
     @SerialName("data")
-    val data: GeoRadius?  = null,
+    val data: GeoRadius? = null,
     @SerialName("errors")
     val errors: List<String>? = null
 ) {

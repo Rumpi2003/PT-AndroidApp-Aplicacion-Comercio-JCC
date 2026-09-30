@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
@@ -40,6 +41,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -57,24 +59,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.ProfileUiState
+import java.util.Locale
 
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
-    viewModel: ProfileViewModel
+    viewModel: ProfileViewModel,
+    onLogout: () -> Unit = {}
 ) {
 
     val uiState by viewModel.uiState.observeAsState(initial = ProfileUiState.Loading)
     var showEditDescriptionDialog by remember { mutableStateOf(false) }
     var showEditCommuneDialog by remember { mutableStateOf(false) }
     var showEditGeoRadiusDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     val communesList by viewModel.communesList.observeAsState(initial = emptyList())
 
     Surface(
@@ -115,7 +122,8 @@ fun ProfileScreen(
                             viewModel.updateProfileVisibility(newVisibility) { success, error ->
 
                             }
-                        }
+                        },
+                        onLogoutClick = { showLogoutDialog = true }
                     )
 
                     if (showEditDescriptionDialog) {
@@ -148,6 +156,13 @@ fun ProfileScreen(
                             }
                         )
                     }
+
+                    if (showLogoutDialog) {
+                        ConfirmLogoutDialog(
+                            onDismissRequest = { showLogoutDialog = false },
+                            onConfirm = onLogout
+                        )
+                    }
                 }
             }
             is ProfileUiState.Error -> {
@@ -169,8 +184,14 @@ fun Profile(
     onEditDescriptionClick: () -> Unit,
     onEditCommuneClick: () -> Unit,
     onEditGeoRadiusClick: () -> Unit,
-    onVisibilityChange: (Boolean) -> Unit
+    onVisibilityChange: (Boolean) -> Unit,
+    onLogoutClick: () -> Unit
 ) {
+
+    val locale = LocalConfiguration.current.locales[0]
+    val km = (profile.geoRadius ?: 0) / 1000.0
+    val formattedRadius = String.format(locale, "%.2f km", km)
+
     Column(
         modifier = modifier,
         verticalArrangement = vArrangement,
@@ -178,7 +199,8 @@ fun Profile(
     ) {
         HeaderProfileCard(
             username = profile.username ?: "Usuario",
-            averageScore = profile.averageScore ?: 0.0f
+            averageScore = profile.averageScore ?: 0.0f,
+            onLogoutClick = onLogoutClick
         )
         DescriptionCard(
             description = profile.profileDescription.orEmpty(),
@@ -199,7 +221,7 @@ fun Profile(
         SingleActionCard(
             icon = Icons.Default.Radar,
             label = "RADIO GEOLOCALIZACIÓN",
-            value = "${profile.geoRadius ?: 0 / 1000} km",
+            value = formattedRadius,
             buttonText = "Cambiar",
             onEditClick = onEditGeoRadiusClick
         )
@@ -258,6 +280,7 @@ fun ErrorContent(
 fun HeaderProfileCard(
     username: String,
     averageScore: Float,
+    onLogoutClick: () -> Unit
 ) {
 
     val filledStars = averageScore.toInt().coerceIn(0, 5)
@@ -265,68 +288,92 @@ fun HeaderProfileCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                        .align(Alignment.BottomEnd)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column{
-                Text(
-                    text = username,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "@${username.lowercase()}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    repeat(5) { index ->
-                        val icon = if (index < filledStars) Icons.Default.Star else Icons.Default.StarOutline
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(MaterialTheme.shapes.large)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            imageVector = icon,
+                            imageVector = Icons.Default.Person,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "$averageScore",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                            .align(Alignment.BottomEnd)
                     )
                 }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = username,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "@${username.lowercase()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        repeat(5) { index ->
+                            val icon =
+                                if (index < filledStars) Icons.Default.Star else Icons.Default.StarOutline
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "$averageScore",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
+                }
+            }
+
+            Button(
+                onClick = onLogoutClick,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp).align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExitToApp,
+                    contentDescription = "Cerrar sesión",
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(text = "Cerrar Sesión", style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -879,6 +926,47 @@ fun EditGeoRadiusDialog(
                 onClick = onDismissRequest,
                 enabled = !isLoading
             ) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun ConfirmLogoutDialog(
+    onDismissRequest: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(
+                text = "Cerrar sesión",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Text(
+                text = "¿Estás seguro de que deseas cerrar sesión?",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick =  {
+                    onDismissRequest()
+                    onConfirm()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Cerrar sesión")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
                 Text("Cancelar")
             }
         }

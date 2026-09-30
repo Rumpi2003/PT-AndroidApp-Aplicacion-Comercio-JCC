@@ -115,7 +115,14 @@ class MainActivity : ComponentActivity() {
                         composable<ProfileRoute> {
                             val profileViewModel: ProfileViewModel = viewModel()
                             ProfileScreen(
-                                viewModel = profileViewModel
+                                viewModel = profileViewModel,
+                                onLogout = {
+                                    sessionManager.clearSession()
+                                    KtorApiClient.token = null
+                                    navController.navigate(LoginRoute) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             )
                         }
                     }
