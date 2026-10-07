@@ -71,8 +71,8 @@ class RegisterViewModel : ViewModel() {
     }
 
     fun onCommuneSelected(selectedCommune: Commune) {
-        _communeId.value = selectedCommune.communeId
-        _selectedCommuneName.value = selectedCommune.communeName
+        _communeId.value = selectedCommune.communeId ?: 0
+        _selectedCommuneName.value = selectedCommune.communeName.orEmpty()
 
         validateForm()
 

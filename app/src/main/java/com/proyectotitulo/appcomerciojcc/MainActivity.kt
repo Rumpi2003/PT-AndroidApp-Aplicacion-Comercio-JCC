@@ -35,6 +35,7 @@ import com.proyectotitulo.appcomerciojcc.ui.navigation.TradeRoute
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileScreen
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileViewModel
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchScreen
+import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 import com.proyectotitulo.appcomerciojcc.ui.trade.TradeScreen
 
 class MainActivity : ComponentActivity() {
@@ -101,7 +102,10 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<SearchRoute> {
-                            SearchScreen()
+                            val searchViewModel: SearchViewModel = viewModel()
+                            SearchScreen(
+                                viewModel = searchViewModel
+                            )
                         }
 
                         composable<HomeRoute> {
