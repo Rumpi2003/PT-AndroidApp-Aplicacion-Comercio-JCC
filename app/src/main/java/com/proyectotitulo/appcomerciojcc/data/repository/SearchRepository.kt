@@ -1,6 +1,7 @@
 package com.proyectotitulo.appcomerciojcc.data.repository
 
 import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
+import com.proyectotitulo.appcomerciojcc.domain.models.GetCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.RegisterResponse
@@ -28,6 +29,26 @@ class SearchRepository {
                 parameter("tcg", tcgId)
                 parameter("sortBy", sortBy)
                 parameter("sortOrder", sortOrder)
+            }.body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCards(tcgId: String, setId: String, name: String, sortBy: String = "name", sortOrder: String = "desc",
+                         page: Int = 1, limit: Int = 10): Result<GetCardsResponse> {
+        return try {
+            val response: GetCardsResponse = client.get("${KtorApiClient.BASE_URL}/tcgApi/buscar") {
+                parameter("tcg_id", tcgId)
+                parameter("set_id", setId)
+                parameter("nombre", name)
+                parameter("sortBy", sortBy)
+                parameter("sortOrder", sortOrder)
+                parameter("pagina", page)
+                parameter("limite", limit)
             }.body()
 
             Result.success(response)

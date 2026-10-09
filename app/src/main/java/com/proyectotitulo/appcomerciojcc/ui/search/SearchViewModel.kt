@@ -100,4 +100,72 @@ class SearchViewModel : ViewModel() {
     fun onSetSelected(set: GetSetsResponse.Data.Set?) {
         _uiState.value = _uiState.value?.copy(selectedSet = set)
     }
+
+    fun onQueryChanged(newQuery: String) {
+        _uiState.value = _uiState.value?.copy(query = newQuery)
+    }
+
+    fun toggleViewMode() {
+        val currentMode = _uiState.value?.isGridView ?: true
+        _uiState.value = _uiState.value?.copy(isGridView = !currentMode)
+    }
+
+    fun searchCards(isNewSearch: Boolean = true) {
+        val currentState = _uiState.value ?: return
+        val targetPage = if (isNewSearch) 1 else (currentState.currentPage + 1)
+
+        viewModelScope.launch {
+            if (isNewSearch) {
+                _uiState.value = currentState.copy(
+                    isSearchingCards = true,
+                    cardsList = emptyList(),
+                    currentPage = 1,
+                    errors = null
+                )
+            } else {
+                _uiState.value = currentState.copy(
+                    isLoadingNextPage = true,
+                    errors = null
+                )
+            }
+
+            val result = repository.getCards(
+                tcgId = currentState.selectedTcg?.tcgId.orEmpty(),
+                setId = currentState.selectedSet?.setId.orEmpty(),
+                name = currentState.query,
+                sortBy = currentState.cardSortBy,
+                sortOrder = currentState.carSortOrder,
+                page = targetPage,
+                limit = currentState.limiterPerPage
+            )
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val newCards = response.data?.results ?: emptyList()
+
+                    val updatedCardsList = if (isNewSearch) newCards else (currentState.cardsList + newCards)
+
+                    _uiState.value = _uiState.value?.copy(
+                        cardsList = updatedCardsList,
+                        currentPage = response.data?.page ?: targetPage,
+                        totalCards = response.data?.total ?: 0,
+                        isSearchingCards = false,
+                        isLoadingNextPage = false
+                    )
+                } else {
+                    _uiState.value = _uiState.value?.copy(
+                        isSearchingCards = false,
+                        isLoadingNextPage = false,
+                        errors = response.errors ?: listOf(response.message)
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = _uiState.value?.copy(
+                    isSearchingCards = false,
+                    isLoadingNextPage = false,
+                    errors = listOf(error.message ?: "Error al buscar cartas")
+                )
+            }
+        }
+    }
 }

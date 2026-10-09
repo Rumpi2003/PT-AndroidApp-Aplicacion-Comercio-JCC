@@ -6,21 +6,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,7 +46,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -46,7 +60,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.proyectotitulo.appcomerciojcc.domain.models.GetCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse.TCG
 import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
@@ -122,6 +140,16 @@ fun Search(
         verticalArrangement = vArrangement,
         horizontalAlignment = hAlignment
     ) {
+        SearchBar(
+            query = uiState.query,
+            onQueryChanged = { viewModel.onQueryChanged(it) },
+            onSearchSelected = { viewModel.searchCards(isNewSearch = true) },
+            enabled = !uiState.isSearchingCards
+        )
+        SearchButton(
+            onClick = { viewModel.searchCards(isNewSearch = true) },
+            isSearching = uiState.isSearchingCards,
+        )
         TcgDropdown(
             tcgsList = uiState.tcgsList,
             selectedTcg = uiState.selectedTcg,
@@ -150,12 +178,109 @@ fun Search(
                 enabled = uiState.selectedTcg != null && !uiState.isLoadingTcgs
             )
         }
+
+        if (uiState.totalCards > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Mostrando ${uiState.cardsList.size} de ${uiState.totalCards} cartas encontradas",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+
+                IconButton(onClick = { viewModel.toggleViewMode() }) {
+                    Icon(
+                        imageVector = if (uiState.isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                        contentDescription = "Alternar vista",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        if (uiState.isGridView) {
+            CardsGrid(
+                cardsList = uiState.cardsList,
+                totalCards = uiState.totalCards,
+                isLoadingNextPage = uiState.isLoadingNextPage,
+                onSearchSelected = { viewModel.searchCards(isNewSearch = false) }
+            )
+        } else {
+            CardList(
+                cardsList = uiState.cardsList,
+                totalCards = uiState.totalCards,
+                isLoadingNextPage = uiState.isLoadingNextPage,
+                onSearchSelected = { viewModel.searchCards(isNewSearch = false) }
+            )
+        }
     }
 }
 
 @Composable
-fun SearchBar(){
+fun SearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    onSearchSelected: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+){
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = { Text("Buscar carta por nombre...") },
+        leadingIcon = {
+            Icon(imageVector = Icons.Default.Search, contentDescription = "Buscar")
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChanged("") },
+                    enabled = enabled
+                ) {
+                    Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar")
+                }
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearchSelected() })
+    )
 
+}
+
+@Composable
+fun SearchButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isSearching: Boolean
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        enabled = !isSearching,
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ),
+    ) {
+        if (isSearching) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+        } else {
+            Text("Buscar Cartas")
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -413,6 +538,187 @@ fun SetSelectionBottomSheet(
                             }
                         }
                         HorizontalDivider()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CardItemRow(card: GetCardsResponse.Data.Card) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+                .height(110.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = card.miniatureUrl,
+                contentDescription = card.cardName,
+                modifier = Modifier.size(80.dp, 110.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ){
+                Text(
+                    text = card.cardName.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Column{
+                    Text(
+                        text = "${card.set.orEmpty()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = "${card.rarity.orEmpty()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CardGridItem(
+    card: GetCardsResponse.Data.Card,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            AsyncImage(
+                model = card.miniatureUrl,
+                contentDescription = card.cardName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            )
+
+            Text(
+                text = card.cardName.orEmpty(),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = card.set.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = card.rarity.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CardList(
+    cardsList: List<GetCardsResponse.Data.Card>,
+    totalCards: Int,
+    isLoadingNextPage: Boolean,
+    onSearchSelected: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(cardsList) { card ->
+            CardItemRow(card = card)
+        }
+
+        if (cardsList.size < totalCards) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoadingNextPage) {
+                        CircularProgressIndicator()
+                    } else {
+                        OutlinedButton(
+                            onClick = onSearchSelected
+                        ) {
+                            Text("Cargar más cartas")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CardsGrid(
+    cardsList: List<GetCardsResponse.Data.Card>,
+    totalCards: Int,
+    isLoadingNextPage: Boolean,
+    onSearchSelected: () -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(cardsList) { card ->
+            CardGridItem(card = card)
+        }
+
+        if (cardsList.size < totalCards) {
+            item(span = { GridItemSpan(2) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoadingNextPage) {
+                        CircularProgressIndicator()
+                    } else {
+                        OutlinedButton(onClick = onSearchSelected) {
+                            Text("Cargar más cartas")
+                        }
                     }
                 }
             }
