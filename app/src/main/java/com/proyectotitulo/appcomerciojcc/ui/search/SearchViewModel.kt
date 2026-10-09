@@ -4,6 +4,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.proyectotitulo.appcomerciojcc.data.repository.InventoryRepository
 import com.proyectotitulo.appcomerciojcc.data.repository.SearchRepository
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse.TCG
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 class SearchViewModel : ViewModel() {
 
     private val repository = SearchRepository()
+    private val inventoryRepository = InventoryRepository()
 
     private val _uiState = MutableLiveData<SearchUiState>(SearchUiState())
     val uiState: LiveData<SearchUiState> = _uiState
@@ -165,6 +167,62 @@ class SearchViewModel : ViewModel() {
                     isLoadingNextPage = false,
                     errors = listOf(error.message ?: "Error al buscar cartas")
                 )
+            }
+        }
+    }
+
+    fun addInventoryCard(
+        cardId: Int,
+        condition: String,
+        language: String,
+        price: Int,
+        quantity: Int,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = inventoryRepository.addInventoryCard(
+                cardId = cardId,
+                condition = condition,
+                language = language,
+                price = price,
+                quantity = quantity
+            )
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    onResult(true, response.message)
+                } else {
+                    val errorMsg = response.errors?.firstOrNull() ?: response.message
+                    onResult(false, errorMsg)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al añadir la carta al inventario")
+            }
+        }
+    }
+
+    fun addWishlistCard(
+        cardId: Int,
+        minimumCondition: String,
+        language: String,
+        quantity: Int,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = inventoryRepository.addWishlistCard(
+                cardId = cardId,
+                minimumCondition = minimumCondition,
+                language = language,
+                quantity = quantity
+            )
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    onResult(true, response.message)
+                } else {
+                    val errorMsg = response.errors?.firstOrNull() ?: response.message
+                    onResult(false, errorMsg)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al añadir la carta a la lista de deseos")
             }
         }
     }

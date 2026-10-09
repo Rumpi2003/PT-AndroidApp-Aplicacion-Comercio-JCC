@@ -27,6 +27,7 @@ import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.ui.components.AppBottomBar
 import com.proyectotitulo.appcomerciojcc.ui.home.HomeScreen
 import com.proyectotitulo.appcomerciojcc.ui.inventory.InventoryScreen
+import com.proyectotitulo.appcomerciojcc.ui.inventory.InventoryViewModel
 import com.proyectotitulo.appcomerciojcc.ui.navigation.HomeRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.InventoryRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.ProfileRoute
@@ -98,7 +99,10 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<InventoryRoute> {
-                            InventoryScreen()
+                            val inventoryViewModel: InventoryViewModel = viewModel()
+                            InventoryScreen(
+                                viewModel = inventoryViewModel
+                            )
                         }
 
                         composable<SearchRoute> {
