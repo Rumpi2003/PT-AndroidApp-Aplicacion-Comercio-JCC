@@ -46,6 +46,8 @@ import coil.compose.AsyncImage
 import com.proyectotitulo.appcomerciojcc.domain.models.GetInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetWishlistResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.InventoryUiState
+import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
+import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 
 @Composable
 fun InventoryScreen(
@@ -58,180 +60,257 @@ fun InventoryScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Tabs para cambiar entre Inventario y Lista de Deseos
-            TabRow(selectedTabIndex = uiState.selectedTab) {
-                Tab(
-                    selected = uiState.selectedTab == 0,
-                    onClick = { viewModel.selectTab(0) },
-                    text = { Text("Mi Inventario") }
-                )
-                Tab(
-                    selected = uiState.selectedTab == 1,
-                    onClick = { viewModel.selectTab(1) },
-                    text = { Text("Lista de Deseos") }
-                )
-            }
+        Inventory(
+            modifier = Modifier.fillMaxSize(),
+            uiState = uiState,
+            viewModel = viewModel
+        )
+    }
+}
 
-            // Header con contador y botón para alternar vista (Grilla/Lista)
-            val currentListSize = if (uiState.selectedTab == 0) uiState.inventoryCards.size else uiState.wishlistCards.size
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+@Composable
+fun Inventory(
+    modifier: Modifier,
+    uiState: InventoryUiState,
+    viewModel: InventoryViewModel
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TabSelection(
+            selectedTab = uiState.selectedTab,
+            selectTab = { viewModel.selectTab(it) }
+        )
+        val currentListSize = if (uiState.selectedTab == 0) uiState.inventoryCards.size else uiState.wishlistCards.size
+        TotalAndViewModeSelection(
+            selectedTab = uiState.selectedTab,
+            currentListSize = currentListSize,
+            toggleViewMode = { viewModel.toggleViewMode() },
+            isGridView = uiState.isGridView
+        )
+        val isLoading = if (uiState.selectedTab == 0) uiState.isLoadingInventory else uiState.isLoadingWishlist
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (uiState.selectedTab == 0) "Total ofrecidas: $currentListSize" else "Total buscadas: $currentListSize",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-
-                IconButton(onClick = { viewModel.toggleViewMode() }) {
-                    Icon(
-                        imageVector = if (uiState.isGridView) Icons.Default.ViewList else Icons.Default.GridView,
-                        contentDescription = "Alternar vista",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                CircularProgressIndicator()
             }
-
-            val isLoading = if (uiState.selectedTab == 0) uiState.isLoadingInventory else uiState.isLoadingWishlist
-
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (uiState.errors != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ErrorOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Error al cargar la lista",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    uiState.errors?.forEach { detail ->
+        } else if (uiState.errors != null) {
+            ErrorScreen(
+                errors = uiState.errors,
+                selectedTab = uiState.selectedTab,
+                loadInventory = { viewModel.loadInventory() },
+                loadWishlist = { viewModel.loadWishlist() }
+            )
+        } else {
+            if (uiState.selectedTab == 0) {
+                if (uiState.inventoryCards.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = detail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
+                            text = "No tienes cartas en tu inventario.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = {
-                            if (uiState.selectedTab == 0) viewModel.loadInventory()
-                            else viewModel.loadWishlist()
-                        }
-                    ) {
-                        Text("Reintentar")
-                    }
+                } else {
+                    InventoryCards(
+                        isGridView = uiState.isGridView,
+                        inventoryCards = uiState.inventoryCards
+                    )
                 }
             } else {
-                if (uiState.selectedTab == 0) {
-                    // SECCIÓN INVENTARIO (OFRECIDAS)
-                    if (uiState.inventoryCards.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No tienes cartas en tu inventario.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    } else {
-                        if (uiState.isGridView) {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(uiState.inventoryCards) { card ->
-                                    InventoryCardGridItem(card = card)
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(uiState.inventoryCards) { card ->
-                                    InventoryCardRowItem(card = card)
-                                }
-                            }
-                        }
+                if (uiState.wishlistCards.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No tienes cartas en tu lista de deseos.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
                     }
                 } else {
-                    // SECCIÓN LISTA DE DESEOS (DESEADAS)
-                    if (uiState.wishlistCards.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No tienes cartas en tu lista de deseos.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    } else {
-                        if (uiState.isGridView) {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(uiState.wishlistCards) { card ->
-                                    WishlistCardGridItem(card = card)
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(uiState.wishlistCards) { card ->
-                                    WishlistCardRowItem(card = card)
-                                }
-                            }
-                        }
-                    }
+                    WishlistCards(
+                        isGridView = uiState.isGridView,
+                        wishlistCards = uiState.wishlistCards
+                    )
                 }
+            }
+        }
+    }
+
+}
+
+@Composable
+fun TabSelection(
+    selectedTab: Int,
+    selectTab: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TabRow(
+        selectedTabIndex = selectedTab,
+        modifier = modifier) {
+        Tab(
+            selected = selectedTab == 0,
+            onClick = { selectTab(0) },
+            text = { Text("Mi Inventario") }
+        )
+        Tab(
+            selected = selectedTab == 1,
+            onClick = { selectTab(1) },
+            text = { Text("Lista de Deseos") }
+        )
+    }
+}
+
+@Composable
+fun TotalAndViewModeSelection(
+    selectedTab: Int,
+    currentListSize: Int,
+    toggleViewMode: () -> Unit,
+    isGridView: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (selectedTab == 0) "Total ofrecidas: $currentListSize" else "Total buscadas: $currentListSize",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary
+        )
+
+        IconButton(onClick = toggleViewMode) {
+            Icon(
+                imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                contentDescription = "Alternar vista",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+
+}
+
+@Composable
+fun ErrorScreen(
+    errors: List<String>?,
+    selectedTab: Int,
+    loadInventory: () -> Unit,
+    loadWishlist: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.ErrorOutline,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Error al cargar la lista",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        errors?.forEach { detail ->
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = {
+                if (selectedTab == 0) loadInventory()
+                else loadWishlist()
+            }
+        ) {
+            Text("Reintentar")
+        }
+    }
+}
+
+@Composable
+fun InventoryCards(
+    isGridView: Boolean,
+    inventoryCards: List<GetInventoryResponse.InventoryCard>,
+    gridModifier: Modifier = Modifier,
+    listModifier: Modifier = Modifier
+) {
+    if (isGridView) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = gridModifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(inventoryCards) { card ->
+                InventoryCardGridItem(card = card)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = listModifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(inventoryCards) { card ->
+                InventoryCardRowItem(card = card)
             }
         }
     }
 }
 
+@Composable
+fun WishlistCards(
+    isGridView: Boolean,
+    wishlistCards: List<GetWishlistResponse.WishlistCard>,
+    gridModifier: Modifier = Modifier,
+    listModifier: Modifier = Modifier
+) {
+    if (isGridView) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = gridModifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(wishlistCards) { card ->
+                WishlistCardGridItem(card = card)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = listModifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(wishlistCards) { card ->
+                WishlistCardRowItem(card = card)
+            }
+        }
+    }
+}
 @Composable
 fun InventoryCardGridItem(card: GetInventoryResponse.InventoryCard) {
     val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
