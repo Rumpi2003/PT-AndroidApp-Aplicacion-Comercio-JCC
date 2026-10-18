@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        KtorApiClient.setupCoil(this)
         val sessionManager = SessionManager(this)
         val initialToken = sessionManager.getToken()
         KtorApiClient.token = initialToken
@@ -51,6 +52,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppComercioJCCTheme {
                 val navController = rememberNavController()
+
+                KtorApiClient.onUnauthorized = {
+                    runOnUiThread {
+                        sessionManager.clearSession()
+                        KtorApiClient.token = null
+                        navController.navigate(LoginRoute) {
+                            popUpTo(0) { inclusive = true}
+                        }
+                    }
+                }
+
                 val startDest = if (initialToken != null) HomeRoute else LoginRoute
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination

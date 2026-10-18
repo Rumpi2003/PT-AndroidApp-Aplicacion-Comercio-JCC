@@ -75,16 +75,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse.TCG
 import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
+import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
 import kotlinx.coroutines.launch
 
 @Composable
@@ -630,11 +629,10 @@ fun CardItemRow(
                 .height(110.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
+            CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(80.dp, 110.dp)
+                modifier = Modifier.fillMaxSize()
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -694,10 +692,9 @@ fun CardGridItem(
                     .height(150.dp),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
+                CardImageThumbnail(
                     model = imageModel,
                     contentDescription = card.cardName,
-                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -892,11 +889,10 @@ fun AddCardOptionsDialog(
                         modifier = Modifier.padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(
+                        CardImageThumbnail(
                             model = dialogImageModel,
                             contentDescription = card.cardName,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(50.dp, 70.dp)
+                            modifier = Modifier.fillMaxSize()
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {

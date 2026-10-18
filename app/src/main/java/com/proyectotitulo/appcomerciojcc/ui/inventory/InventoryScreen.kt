@@ -47,6 +47,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.GetInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetWishlistResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.InventoryUiState
 import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
+import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 
 @Composable
@@ -332,10 +333,9 @@ fun InventoryCardGridItem(card: GetInventoryResponse.InventoryCard) {
                     .height(140.dp),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
+                CardImageThumbnail(
                     model = imageModel,
                     contentDescription = card.cardName,
-                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -408,11 +408,10 @@ fun InventoryCardRowItem(card: GetInventoryResponse.InventoryCard) {
                 .height(110.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
+            CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(80.dp, 110.dp)
+                modifier = Modifier.fillMaxSize()
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -490,10 +489,9 @@ fun WishlistCardGridItem(card: GetWishlistResponse.WishlistCard) {
                     .height(140.dp),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
+                CardImageThumbnail(
                     model = imageModel,
                     contentDescription = card.cardName,
-                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -557,11 +555,10 @@ fun WishlistCardRowItem(card: GetWishlistResponse.WishlistCard) {
                 .height(110.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
+            CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(80.dp, 110.dp)
+                modifier = Modifier.fillMaxSize()
             )
 
             Spacer(modifier = Modifier.width(12.dp))
