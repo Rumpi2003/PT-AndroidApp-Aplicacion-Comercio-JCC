@@ -75,10 +75,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse.TCG
@@ -892,7 +894,7 @@ fun AddCardOptionsDialog(
                         CardImageThumbnail(
                             model = dialogImageModel,
                             contentDescription = card.cardName,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.size(50.dp, 70.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
