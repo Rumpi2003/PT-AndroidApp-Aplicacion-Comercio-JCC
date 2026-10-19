@@ -223,13 +223,23 @@ fun ForgotPassword() {
 fun ErrorMessage(uiState: LoginUiState) {
     if (uiState is LoginUiState.Error) {
         val errorState = uiState as LoginUiState.Error
-        errorState.errors?.forEach { detail ->
-            Text(
-                text = "• $detail",
-                modifier = Modifier.padding(start = 8.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
+        val errorList = errorState.errors?.filter { it.isNotBlank() }
+        val messages = if (!errorList.isNullOrEmpty()) errorList else listOf("Correo o contraseña incorrectos.")
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            messages.forEach { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
         }
     }
 }

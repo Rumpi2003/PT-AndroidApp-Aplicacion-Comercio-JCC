@@ -408,10 +408,13 @@ fun InventoryCardRowItem(card: GetInventoryResponse.InventoryCard) {
                 .height(110.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(70.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -419,7 +422,8 @@ fun InventoryCardRowItem(card: GetInventoryResponse.InventoryCard) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 4.dp)
+                    .weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
@@ -555,10 +559,13 @@ fun WishlistCardRowItem(card: GetWishlistResponse.WishlistCard) {
                 .height(110.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(70.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -566,7 +573,8 @@ fun WishlistCardRowItem(card: GetWishlistResponse.WishlistCard) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 4.dp)
+                    .weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {

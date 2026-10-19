@@ -57,13 +57,19 @@ class LoginViewModel : ViewModel() {
                         message = response.message
                     )
                 } else {
-                    _uiState.value = LoginUiState.Error(
-                        errors = response.errors ?: listOf(response.message)
-                    )
+                    val errorList = response.errors?.filter { it.isNotBlank() }
+                    val message = if (!errorList.isNullOrEmpty()) {
+                        errorList
+                    } else if (response.message.isNotBlank()) {
+                        listOf(response.message)
+                    } else {
+                        listOf("Credenciales incorrectas. Verifica tu correo y contraseña.")
+                    }
+                    _uiState.value = LoginUiState.Error(errors = message)
                 }
             }.onFailure { error ->
                 _uiState.value = LoginUiState.Error(
-                    errors = listOf(error.message ?: "Error de red inesperado")
+                    errors = listOf("Credenciales incorrectas o error de conexión. Verifica tus datos.")
                 )
             }
         }

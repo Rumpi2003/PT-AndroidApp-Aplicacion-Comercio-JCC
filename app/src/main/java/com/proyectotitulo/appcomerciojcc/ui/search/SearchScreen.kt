@@ -634,7 +634,9 @@ fun CardItemRow(
             CardImageThumbnail(
                 model = imageModel,
                 contentDescription = card.cardName,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(70.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -642,7 +644,8 @@ fun CardItemRow(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 10.dp)
+                    .weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ){
                 Text(
@@ -653,12 +656,12 @@ fun CardItemRow(
 
                 Column{
                     Text(
-                        text = "${card.set.orEmpty()}",
+                        text = card.set.orEmpty(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        text = "${card.rarity.orEmpty()}",
+                        text = card.rarity.orEmpty(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
