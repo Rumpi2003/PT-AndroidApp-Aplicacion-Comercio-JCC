@@ -226,4 +226,39 @@ class SearchViewModel : ViewModel() {
             }
         }
     }
+
+    fun resetSearchScreen() {
+        viewModelScope.launch {
+            val currentIsGrid = _uiState.value?.isGridView ?: true
+
+            _uiState.value = SearchUiState(
+                isRefreshing = true,
+                isGridView = currentIsGrid
+            )
+
+            val result = repository.getTcgs()
+            val latestState = _uiState.value ?: SearchUiState()
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    _uiState.value = latestState.copy(
+                        tcgsList = response.data ?: emptyList(),
+                        isLoadingTcgs = false,
+                        isRefreshing = false
+                    )
+                } else {
+                    _uiState.value = latestState.copy(
+                        isLoadingTcgs = false,
+                        isRefreshing = false,
+                        errors = response.errors ?: listOf(response.message)
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = latestState.copy(
+                    isLoadingTcgs = false,
+                    isRefreshing = false,
+                    errors = listOf(error.message ?: "Error de red inesperado")
+                )
+            }
+        }
+    }
 }

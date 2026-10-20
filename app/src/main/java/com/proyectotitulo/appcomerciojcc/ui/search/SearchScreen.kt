@@ -64,6 +64,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -88,6 +89,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
 import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     modifier: Modifier = Modifier,
@@ -117,15 +119,19 @@ fun SearchScreen(
                 }
             }
 
-            Search(
-                modifier = Modifier.fillMaxSize(),
-                uiState = uiState,
-                viewModel = viewModel,
-                onOpenSetSheet = { showSetBottomSheet = true },
-                onCardClick = { card ->
-                    selectedCardForDetails = card
-                }
-            )
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = { viewModel.resetSearchScreen() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Search(
+                    modifier = Modifier.fillMaxSize(),
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onOpenSetSheet = { showSetBottomSheet = true },
+                    onCardClick = { card -> selectedCardForDetails = card }
+                )
+            }
 
             if (showSetBottomSheet && uiState.selectedTcg != null) {
                 SetSelectionBottomSheet(

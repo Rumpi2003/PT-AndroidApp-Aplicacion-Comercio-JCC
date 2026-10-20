@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
@@ -50,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -70,6 +73,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.ProfileUiState
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
@@ -78,6 +82,7 @@ fun ProfileScreen(
 ) {
 
     val uiState by viewModel.uiState.observeAsState(initial = ProfileUiState.Loading)
+    val isRefreshing by viewModel.isRefreshing.observeAsState(initial = false)
     var showEditDescriptionDialog by remember { mutableStateOf(false) }
     var showEditCommuneDialog by remember { mutableStateOf(false) }
     var showEditGeoRadiusDialog by remember { mutableStateOf(false) }
@@ -105,26 +110,32 @@ fun ProfileScreen(
                         onRetry = { viewModel.loadProfile() }
                     )
                 } else {
-                    Profile(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        vArrangement = Arrangement.spacedBy(12.dp),
-                        hAlignment = Alignment.CenterHorizontally,
-                        profile = profile,
-                        onEditDescriptionClick = { showEditDescriptionDialog = true },
-                        onEditCommuneClick = {
-                            viewModel.loadCommunes()
-                            showEditCommuneDialog = true
-                        },
-                        onEditGeoRadiusClick = { showEditGeoRadiusDialog = true },
-                        onVisibilityChange = { newVisibility ->
-                            viewModel.updateProfileVisibility(newVisibility) { success, error ->
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadProfile(forceRefresh = true) },
+                        modifier = modifier.fillMaxSize()
+                    ) {
+                        Profile(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            vArrangement = Arrangement.spacedBy(12.dp),
+                            hAlignment = Alignment.CenterHorizontally,
+                            profile = profile,
+                            onEditDescriptionClick = { showEditDescriptionDialog = true },
+                            onEditCommuneClick = {
+                                viewModel.loadCommunes()
+                                showEditCommuneDialog = true
+                            },
+                            onEditGeoRadiusClick = { showEditGeoRadiusDialog = true },
+                            onVisibilityChange = { newVisibility ->
+                                viewModel.updateProfileVisibility(newVisibility) { success, error ->
 
-                            }
-                        },
-                        onLogoutClick = { showLogoutDialog = true }
-                    )
+                                }
+                            },
+                            onLogoutClick = { showLogoutDialog = true }
+                        )
+                    }
 
                     if (showEditDescriptionDialog) {
                         EditDescriptionDialog(
@@ -193,7 +204,7 @@ fun Profile(
     val formattedRadius = String.format(locale, "%.2f km", km)
 
     Column(
-        modifier = modifier,
+        modifier = modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = vArrangement,
         horizontalAlignment = hAlignment
     ) {

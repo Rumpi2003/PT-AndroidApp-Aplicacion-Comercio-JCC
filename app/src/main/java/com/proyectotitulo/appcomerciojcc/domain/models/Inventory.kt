@@ -169,5 +169,6 @@ data class InventoryUiState(
     val isGridView: Boolean = true,
     val isLoadingInventory: Boolean = false,
     val isLoadingWishlist: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errors: List<String>? = null
 )

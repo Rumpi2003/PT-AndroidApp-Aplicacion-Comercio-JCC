@@ -15,6 +15,7 @@ class InventoryViewModel : ViewModel() {
     private val _uiState = MutableLiveData<InventoryUiState>(InventoryUiState())
     val uiState: LiveData<InventoryUiState> = _uiState
 
+
     init {
         loadInventory()
         loadWishlist()
@@ -34,52 +35,77 @@ class InventoryViewModel : ViewModel() {
         _uiState.value = _uiState.value?.copy(isGridView = !currentMode)
     }
 
-    fun loadInventory() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value?.copy(isLoadingInventory = true, errors = null)
+    fun loadInventory(forceRefresh: Boolean = false) {
+        val currentState = _uiState.value ?: InventoryUiState()
+        if (!forceRefresh && currentState.inventoryCards.isNotEmpty()) {
+            return
+        }
 
+        viewModelScope.launch {
+            if (forceRefresh) {
+                _uiState.value = currentState.copy(isRefreshing = true, errors = null)
+            } else {
+                _uiState.value = currentState.copy(isLoadingInventory = true, errors = null)
+            }
             val result = repository.getInventory()
+            val latestState = _uiState.value ?: InventoryUiState()
             result.onSuccess { response ->
                 if (response.status == "success") {
-                    _uiState.value = _uiState.value?.copy(
+                    _uiState.value = latestState.copy(
                         inventoryCards = response.data ?: emptyList(),
-                        isLoadingInventory = false
+                        isLoadingInventory = false,
+                        isRefreshing = false
                     )
                 } else {
-                    _uiState.value = _uiState.value?.copy(
+                    _uiState.value = latestState.copy(
                         isLoadingInventory = false,
+                        isRefreshing = false,
                         errors = response.errors ?: listOf(response.message)
                     )
                 }
             }.onFailure { error ->
-                _uiState.value = _uiState.value?.copy(
+                _uiState.value = latestState.copy(
                     isLoadingInventory = false,
+                    isRefreshing = false,
                     errors = listOf(error.message ?: "Error al cargar el inventario")
                 )
             }
         }
     }
 
-    fun loadWishlist() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value?.copy(isLoadingWishlist = true, errors = null)
+    fun loadWishlist(forceRefresh: Boolean = false) {
+        val currentState = _uiState.value ?: InventoryUiState()
+        if (!forceRefresh && currentState.wishlistCards.isNotEmpty()) {
+            return
+        }
 
+        viewModelScope.launch {
+            if (forceRefresh) {
+                _uiState.value = currentState.copy(isRefreshing = true, errors = null)
+            } else {
+                _uiState.value = currentState.copy(isLoadingWishlist = true, errors = null)
+            }
             val result = repository.getWishlist()
+            val latestState = _uiState.value ?: InventoryUiState()
+
             result.onSuccess { response ->
                 if (response.status == "success") {
-                    _uiState.value = _uiState.value?.copy(
+                    _uiState.value = latestState.copy(
                         wishlistCards = response.data ?: emptyList(),
-                        isLoadingWishlist = false
+                        isLoadingWishlist = false,
+                        isRefreshing = false
                     )
                 } else {
-                    _uiState.value = _uiState.value?.copy(
+                    _uiState.value = latestState.copy(
                         isLoadingWishlist = false,
+                        isRefreshing = false,
                         errors = response.errors ?: listOf(response.message)
                     )
                 }
             }.onFailure { error ->
-                _uiState.value = _uiState.value?.copy(
+                _uiState.value = latestState.copy(
                     isLoadingWishlist = false,
+                    isRefreshing = false,
                     errors = listOf(error.message ?: "Error al cargar la lista de deseos")
                 )
             }

@@ -20,6 +20,9 @@ class ProfileViewModel : ViewModel() {
     private val _communesList = MutableLiveData<List<GetCommuneResponse.Commune>>(emptyList())
     val communesList: LiveData<List<GetCommuneResponse.Commune>> = _communesList
 
+    private val _isRefreshing = MutableLiveData<Boolean>(false)
+    val isRefreshing: LiveData<Boolean> = _isRefreshing
+
     init {
         loadProfile()
     }
@@ -43,12 +46,21 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun loadProfile() {
+    fun loadProfile(forceRefresh: Boolean = false) {
+        if (!forceRefresh && _uiState.value is ProfileUiState.Success) {
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.value = ProfileUiState.Loading
+            if (forceRefresh) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = ProfileUiState.Loading
+            }
 
             val result = repository.getPrivateProfile()
             result.onSuccess { response ->
+                _isRefreshing.value = false
                 if (response.status == "success") {
                     _uiState.value = ProfileUiState.Success(response.data)
                 } else {
@@ -57,6 +69,7 @@ class ProfileViewModel : ViewModel() {
                     )
                 }
             }.onFailure { error ->
+                _isRefreshing.value = false
                 _uiState.value = ProfileUiState.Error(
                     errors = listOf(error.message ?: "Error de red inesperado")
                 )

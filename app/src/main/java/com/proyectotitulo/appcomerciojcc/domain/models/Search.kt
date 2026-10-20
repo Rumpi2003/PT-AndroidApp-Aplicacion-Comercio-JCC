@@ -122,6 +122,7 @@ data class SearchUiState(
     val isLoadingSets: Boolean = false,
     val isSearchingCards: Boolean = false,
     val isLoadingNextPage: Boolean = false,
+    val isRefreshing: Boolean = false,
 
     val errors: List<String>? = null
 )

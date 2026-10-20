@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -50,6 +52,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
 import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventoryScreen(
     modifier: Modifier = Modifier,
@@ -61,11 +64,20 @@ fun InventoryScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Inventory(
-            modifier = Modifier.fillMaxSize(),
-            uiState = uiState,
-            viewModel = viewModel
-        )
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = {
+                if (uiState.selectedTab == 0) viewModel.loadInventory(forceRefresh = true)
+                else viewModel.loadWishlist(forceRefresh = true)
+            },
+            modifier = modifier.fillMaxSize()
+        ) {
+            Inventory(
+                modifier = Modifier.fillMaxSize(),
+                uiState = uiState,
+                viewModel = viewModel
+            )
+        }
     }
 }
 
@@ -76,7 +88,7 @@ fun Inventory(
     viewModel: InventoryViewModel
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TabSelection(
@@ -179,7 +191,9 @@ fun TotalAndViewModeSelection(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -259,7 +273,9 @@ fun InventoryCards(
     if (isGridView) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = gridModifier.fillMaxSize(),
+            modifier = gridModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -270,7 +286,9 @@ fun InventoryCards(
         }
     } else {
         LazyColumn(
-            modifier = listModifier.fillMaxSize(),
+            modifier = listModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -291,7 +309,9 @@ fun WishlistCards(
     if (isGridView) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = gridModifier.fillMaxSize(),
+            modifier = gridModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -302,7 +322,9 @@ fun WishlistCards(
         }
     } else {
         LazyColumn(
-            modifier = listModifier.fillMaxSize(),
+            modifier = listModifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
