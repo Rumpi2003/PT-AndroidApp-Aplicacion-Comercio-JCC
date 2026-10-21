@@ -35,7 +35,7 @@ class InventoryViewModel : ViewModel() {
         _uiState.value = _uiState.value?.copy(isGridView = !currentMode)
     }
 
-    fun loadInventory(forceRefresh: Boolean = false) {
+    fun loadInventory(forceRefresh: Boolean = false, sortBy: String? = "nombre_carta", sortOrder: String? = "ASC") {
         val currentState = _uiState.value ?: InventoryUiState()
         if (!forceRefresh && currentState.inventoryCards.isNotEmpty()) {
             return
@@ -47,7 +47,7 @@ class InventoryViewModel : ViewModel() {
             } else {
                 _uiState.value = currentState.copy(isLoadingInventory = true, errors = null)
             }
-            val result = repository.getInventory()
+            val result = repository.getInventory(sortBy = sortBy, sortOrder = sortOrder)
             val latestState = _uiState.value ?: InventoryUiState()
             result.onSuccess { response ->
                 if (response.status == "success") {
@@ -73,7 +73,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
-    fun loadWishlist(forceRefresh: Boolean = false) {
+    fun loadWishlist(forceRefresh: Boolean = false, sortBy: String? = "nombre_carta", sortOrder: String? = "ASC") {
         val currentState = _uiState.value ?: InventoryUiState()
         if (!forceRefresh && currentState.wishlistCards.isNotEmpty()) {
             return
@@ -85,7 +85,7 @@ class InventoryViewModel : ViewModel() {
             } else {
                 _uiState.value = currentState.copy(isLoadingWishlist = true, errors = null)
             }
-            val result = repository.getWishlist()
+            val result = repository.getWishlist(sortBy = sortBy, sortOrder = sortOrder)
             val latestState = _uiState.value ?: InventoryUiState()
 
             result.onSuccess { response ->
@@ -109,6 +109,15 @@ class InventoryViewModel : ViewModel() {
                     errors = listOf(error.message ?: "Error al cargar la lista de deseos")
                 )
             }
+        }
+    }
+
+    fun onSortOptionSelected(sortBy: String, sortOrder: String) {
+        val currentState = _uiState.value ?: InventoryUiState()
+        if (currentState.selectedTab == 0) {
+            loadInventory(forceRefresh = true, sortBy = sortBy, sortOrder = sortOrder)
+        } else {
+            loadWishlist(forceRefresh = true, sortBy = sortBy, sortOrder = sortOrder)
         }
     }
 }

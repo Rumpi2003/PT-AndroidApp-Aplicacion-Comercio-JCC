@@ -1,5 +1,7 @@
 package com.proyectotitulo.appcomerciojcc.ui.components
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -12,8 +14,10 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -46,7 +50,10 @@ fun AppBottomBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    NavigationBar {
+    NavigationBar(
+        modifier = Modifier.height(80.dp),
+        windowInsets = WindowInsets(0, 0, 0, 0)
+    ) {
         items.forEach { item ->
             val isSelected = currentDestination?.hierarchy?.any {
                 it.hasRoute(item.route::class)
@@ -54,7 +61,7 @@ fun AppBottomBar(navController: NavController) {
 
             NavigationBarItem(
                 selected = isSelected,
-                label = { },
+                label = null,
                 icon = { Icon(item.icon, contentDescription =  item.label) },
                 onClick = {
                     navController.navigate(item.route) {

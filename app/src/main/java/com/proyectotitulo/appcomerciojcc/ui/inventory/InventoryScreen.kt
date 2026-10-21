@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ViewList
@@ -26,7 +27,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +42,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -95,13 +102,23 @@ fun Inventory(
             selectedTab = uiState.selectedTab,
             selectTab = { viewModel.selectTab(it) }
         )
+
         val currentListSize = if (uiState.selectedTab == 0) uiState.inventoryCards.size else uiState.wishlistCards.size
+        val currentSortBy = if (uiState.selectedTab == 0) uiState.inventorySortBy else uiState.wishlistSortBy
+        val currentSortOrder = if (uiState.selectedTab == 0) uiState.inventorySortOrder else uiState.wishlistSortOrder
+
         TotalAndViewModeSelection(
             selectedTab = uiState.selectedTab,
             currentListSize = currentListSize,
+            currentSortBy = currentSortBy,
+            currentSortOrder = currentSortOrder,
+            onSortSelected = { sortBy, sortOrder ->
+                viewModel.onSortOptionSelected(sortBy, sortOrder)
+            },
             toggleViewMode = { viewModel.toggleViewMode() },
             isGridView = uiState.isGridView
         )
+
         val isLoading = if (uiState.selectedTab == 0) uiState.isLoadingInventory else uiState.isLoadingWishlist
         if (isLoading) {
             Box(
@@ -182,14 +199,46 @@ fun TabSelection(
     }
 }
 
+data class SortOption(
+    val label: String,
+    val sortBy: String,
+    val sortOrder: String
+)
+
 @Composable
 fun TotalAndViewModeSelection(
     selectedTab: Int,
     currentListSize: Int,
+    currentSortBy: String,
+    currentSortOrder: String,
+    onSortSelected: (String, String) -> Unit,
     toggleViewMode: () -> Unit,
     isGridView: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val options = if (selectedTab == 0) {
+        listOf(
+            SortOption("Nombre ▲", "nombre_carta", "ASC"),
+            SortOption("Nombre ▼", "nombre_carta", "DESC"),
+            SortOption("Precio ▲", "precio", "ASC"),
+            SortOption("Precio ▼", "precio", "DESC"),
+            SortOption("Franquicia ▲", "franquicia", "ASC"),
+            SortOption("Franquicia ▼", "franquicia", "DESC")
+        )
+    } else {
+        listOf(
+            SortOption("Nombre ▲", "nombre_carta", "ASC"),
+            SortOption("Nombre ▼", "nombre_carta", "DESC"),
+            SortOption("Franquicia ▲", "franquicia", "ASC"),
+            SortOption("Franquicia ▼", "franquicia", "DESC")
+        )
+    }
+
+    val selectedOption = options.find { it.sortBy == currentSortBy && it.sortOrder == currentSortOrder }
+        ?: options.first()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -202,6 +251,45 @@ fun TotalAndViewModeSelection(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.secondary
         )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box {
+                FilterChip(
+                    selected = true,
+                    onClick = { expanded = true },
+                    label = {
+                        Text(
+                            text = selectedOption.label,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Desplegar opciones de orden"
+                        )
+                    }
+                )
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(text = option.label) },
+                            onClick = {
+                                onSortSelected(option.sortBy, option.sortOrder)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         IconButton(onClick = toggleViewMode) {
             Icon(

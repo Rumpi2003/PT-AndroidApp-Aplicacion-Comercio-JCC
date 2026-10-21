@@ -164,6 +164,10 @@ data class GetWishlistResponse(
 
 data class InventoryUiState(
     val selectedTab: Int = 0, // 0 = Inventario (Ofrecidas), 1 = Lista de Deseos (Deseadas)
+    val inventorySortBy: String = "nombre_carta",
+    val inventorySortOrder: String = "ASC",
+    val wishlistSortBy: String = "nombre_carta",
+    val wishlistSortOrder: String = "ASC",
     val inventoryCards: List<GetInventoryResponse.InventoryCard> = emptyList(),
     val wishlistCards: List<GetWishlistResponse.WishlistCard> = emptyList(),
     val isGridView: Boolean = true,
