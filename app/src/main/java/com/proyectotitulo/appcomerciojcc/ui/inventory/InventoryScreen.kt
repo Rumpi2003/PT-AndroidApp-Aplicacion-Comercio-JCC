@@ -1,5 +1,6 @@
 package com.proyectotitulo.appcomerciojcc.ui.inventory
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,46 +19,63 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Numbers
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.proyectotitulo.appcomerciojcc.domain.models.GetInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetWishlistResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.InventoryUiState
-import com.proyectotitulo.appcomerciojcc.domain.models.SearchUiState
 import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
-import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,23 +85,131 @@ fun InventoryScreen(
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = InventoryUiState())
 
-    Surface(
+    var selectedInventoryCard by remember { mutableStateOf<GetInventoryResponse.InventoryCard?>(null) }
+    var selectedWishlistCard by remember { mutableStateOf<GetWishlistResponse.WishlistCard?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    Scaffold(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = {
-                if (uiState.selectedTab == 0) viewModel.loadInventory(forceRefresh = true)
-                else viewModel.loadWishlist(forceRefresh = true)
-            },
-            modifier = modifier.fillMaxSize()
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { innerPadding ->
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            color = MaterialTheme.colorScheme.background
         ) {
-            Inventory(
-                modifier = Modifier.fillMaxSize(),
-                uiState = uiState,
-                viewModel = viewModel
-            )
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = {
+                    if (uiState.selectedTab == 0) viewModel.loadInventory(forceRefresh = true)
+                    else viewModel.loadWishlist(forceRefresh = true)
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Inventory(
+                    modifier = Modifier.fillMaxSize(),
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onInventoryCardClick = { card ->
+                        selectedInventoryCard = card
+                    },
+                    onWishlistCardClick = { card ->
+                        selectedWishlistCard = card
+                    }
+                )
+            }
+
+            selectedInventoryCard?.let { card ->
+                val cardId = card.inventoryCardId ?: 0
+                EditInventoryCardDialog(
+                    card = card,
+                    onDismissRequest = { selectedInventoryCard = null },
+                    onConfirmUpdate = { condition, language, price, quantity, onResult ->
+                        viewModel.patchInventoryCard(cardId, condition, language, price, quantity) { success, msg ->
+                            onResult(success, msg)
+                            if (success) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = msg ?: "Carta actualizada con éxito"
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onDeleteClick = {
+                        showDeleteConfirmDialog = true
+                    }
+                )
+
+                if (showDeleteConfirmDialog) {
+                    ConfirmDeleteCardDialog(
+                        cardName = card.cardName.orEmpty(),
+                        onDismissRequest = { showDeleteConfirmDialog = false },
+                        onConfirmDelete = { onResult ->
+                            viewModel.deleteInventoryCard(cardId) { success, msg ->
+                                onResult(success, msg)
+                                if (success) {
+                                    showDeleteConfirmDialog = false
+                                    selectedInventoryCard = null
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = msg ?: "Carta eliminada del inventario con éxito"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
+            selectedWishlistCard?.let { card ->
+                val cardId = card.wishlistCardId ?: 0
+                EditWishlistCardDialog(
+                    card = card,
+                    onDismissRequest = { selectedWishlistCard = null },
+                    onConfirmUpdate = { minCondition, language, quantity, onResult ->
+                        viewModel.patchWishlistCard(cardId, minCondition, language, quantity) { success, msg ->
+                            onResult(success, msg)
+                            if (success) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = msg ?: "Carta de deseos actualizada con éxito"
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onDeleteClick = {
+                        showDeleteConfirmDialog = true
+                    }
+                )
+
+                if (showDeleteConfirmDialog) {
+                    ConfirmDeleteCardDialog(
+                        cardName = card.cardName.orEmpty(),
+                        onDismissRequest = { showDeleteConfirmDialog = false },
+                        onConfirmDelete = { onResult ->
+                            viewModel.deleteWishlistCard(cardId) { success, msg ->
+                                onResult(success, msg)
+                                if (success) {
+                                    showDeleteConfirmDialog = false
+                                    selectedWishlistCard = null
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = msg ?: "Carta eliminada de la lista de deseos con éxito"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -92,7 +218,9 @@ fun InventoryScreen(
 fun Inventory(
     modifier: Modifier,
     uiState: InventoryUiState,
-    viewModel: InventoryViewModel
+    viewModel: InventoryViewModel,
+    onInventoryCardClick: (GetInventoryResponse.InventoryCard) -> Unit = {},
+    onWishlistCardClick: (GetWishlistResponse.WishlistCard) -> Unit = {}
 ) {
     Column(
         modifier = modifier,
@@ -150,7 +278,8 @@ fun Inventory(
                 } else {
                     InventoryCards(
                         isGridView = uiState.isGridView,
-                        inventoryCards = uiState.inventoryCards
+                        inventoryCards = uiState.inventoryCards,
+                        onCardClick = onInventoryCardClick
                     )
                 }
             } else {
@@ -168,13 +297,13 @@ fun Inventory(
                 } else {
                     WishlistCards(
                         isGridView = uiState.isGridView,
-                        wishlistCards = uiState.wishlistCards
+                        wishlistCards = uiState.wishlistCards,
+                        onCardClick = onWishlistCardClick
                     )
                 }
             }
         }
     }
-
 }
 
 @Composable
@@ -289,17 +418,16 @@ fun TotalAndViewModeSelection(
                     }
                 }
             }
-        }
 
-        IconButton(onClick = toggleViewMode) {
-            Icon(
-                imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
-                contentDescription = "Alternar vista",
-                tint = MaterialTheme.colorScheme.primary
-            )
+            IconButton(onClick = toggleViewMode) {
+                Icon(
+                    imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                    contentDescription = "Alternar vista",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
-
 }
 
 @Composable
@@ -355,6 +483,7 @@ fun ErrorScreen(
 fun InventoryCards(
     isGridView: Boolean,
     inventoryCards: List<GetInventoryResponse.InventoryCard>,
+    onCardClick: (GetInventoryResponse.InventoryCard) -> Unit = {},
     gridModifier: Modifier = Modifier,
     listModifier: Modifier = Modifier
 ) {
@@ -369,7 +498,10 @@ fun InventoryCards(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(inventoryCards) { card ->
-                InventoryCardGridItem(card = card)
+                InventoryCardGridItem(
+                    card = card,
+                    onClick = { onCardClick(card) }
+                )
             }
         }
     } else {
@@ -381,7 +513,10 @@ fun InventoryCards(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(inventoryCards) { card ->
-                InventoryCardRowItem(card = card)
+                InventoryCardRowItem(
+                    card = card,
+                    onClick = { onCardClick(card) }
+                )
             }
         }
     }
@@ -391,6 +526,7 @@ fun InventoryCards(
 fun WishlistCards(
     isGridView: Boolean,
     wishlistCards: List<GetWishlistResponse.WishlistCard>,
+    onCardClick: (GetWishlistResponse.WishlistCard) -> Unit = {},
     gridModifier: Modifier = Modifier,
     listModifier: Modifier = Modifier
 ) {
@@ -405,7 +541,10 @@ fun WishlistCards(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(wishlistCards) { card ->
-                WishlistCardGridItem(card = card)
+                WishlistCardGridItem(
+                    card = card,
+                    onClick = { onCardClick(card) }
+                )
             }
         }
     } else {
@@ -417,17 +556,26 @@ fun WishlistCards(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(wishlistCards) { card ->
-                WishlistCardRowItem(card = card)
+                WishlistCardRowItem(
+                    card = card,
+                    onClick = { onCardClick(card) }
+                )
             }
         }
     }
 }
+
 @Composable
-fun InventoryCardGridItem(card: GetInventoryResponse.InventoryCard) {
+fun InventoryCardGridItem(
+    card: GetInventoryResponse.InventoryCard,
+    onClick: () -> Unit = {}
+) {
     val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -503,11 +651,16 @@ fun InventoryCardGridItem(card: GetInventoryResponse.InventoryCard) {
 }
 
 @Composable
-fun InventoryCardRowItem(card: GetInventoryResponse.InventoryCard) {
+fun InventoryCardRowItem(
+    card: GetInventoryResponse.InventoryCard,
+    onClick: () -> Unit = {}
+) {
     val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -583,11 +736,16 @@ fun InventoryCardRowItem(card: GetInventoryResponse.InventoryCard) {
 }
 
 @Composable
-fun WishlistCardGridItem(card: GetWishlistResponse.WishlistCard) {
+fun WishlistCardGridItem(
+    card: GetWishlistResponse.WishlistCard,
+    onClick: () -> Unit = {}
+) {
     val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -654,11 +812,16 @@ fun WishlistCardGridItem(card: GetWishlistResponse.WishlistCard) {
 }
 
 @Composable
-fun WishlistCardRowItem(card: GetWishlistResponse.WishlistCard) {
+fun WishlistCardRowItem(
+    card: GetWishlistResponse.WishlistCard,
+    onClick: () -> Unit = {}
+) {
     val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -719,4 +882,584 @@ fun WishlistCardRowItem(card: GetWishlistResponse.WishlistCard) {
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditInventoryCardDialog(
+    card: GetInventoryResponse.InventoryCard,
+    onDismissRequest: () -> Unit,
+    onConfirmUpdate: (String, String, Int, Int, (Boolean, String?) -> Unit) -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val conditions = remember {
+        listOf(
+            "PERFECTA",
+            "RECIEN_ABIERTA",
+            "DESGASTE_MENOR",
+            "DESGASTE_VISIBLE",
+            "DESGASTE_SEVERO",
+            "DAÑADA",
+            "DESTRUIDA"
+        )
+    }
+
+    val languages = remember {
+        listOf(
+            "Inglés",
+            "Japonés",
+            "Español",
+            "Francés",
+            "Alemán",
+            "Italiano",
+            "Portugués",
+            "Coreano",
+            "Chino"
+        )
+    }
+
+    var selectedCondition by remember { mutableStateOf(card.condition ?: conditions[0]) }
+    var selectedLanguage by remember { mutableStateOf(card.language ?: languages[0]) }
+    var priceText by remember { mutableStateOf(card.price?.toString() ?: "0") }
+    var quantityText by remember { mutableStateOf(card.quantity?.toString() ?: "1") }
+
+    var expandedConditionDropdown by remember { mutableStateOf(false) }
+    var expandedLanguageDropdown by remember { mutableStateOf(false) }
+
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismissRequest() },
+        title = {
+            Text(
+                text = "Editar Carta de Inventario",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CardImageThumbnail(
+                            model = imageModel,
+                            contentDescription = card.cardName,
+                            modifier = Modifier.size(50.dp, 70.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = card.cardName.orEmpty(),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${card.tcg.orEmpty()} • ${card.set.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedConditionDropdown,
+                    onExpandedChange = { if (!isLoading) expandedConditionDropdown = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedCondition,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Estado de la carta") },
+                        leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedConditionDropdown) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        enabled = !isLoading
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedConditionDropdown,
+                        onDismissRequest = { expandedConditionDropdown = false }
+                    ) {
+                        conditions.forEach { cond ->
+                            DropdownMenuItem(
+                                text = { Text(cond) },
+                                onClick = {
+                                    selectedCondition = cond
+                                    expandedConditionDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedLanguageDropdown,
+                    onExpandedChange = { if (!isLoading) expandedLanguageDropdown = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedLanguage,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Idioma") },
+                        leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedLanguageDropdown) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        enabled = !isLoading
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedLanguageDropdown,
+                        onDismissRequest = { expandedLanguageDropdown = false }
+                    ) {
+                        languages.forEach { lang ->
+                            DropdownMenuItem(
+                                text = { Text(lang) },
+                                onClick = {
+                                    selectedLanguage = lang
+                                    expandedLanguageDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() }) {
+                            priceText = input
+                        }
+                    },
+                    label = { Text("Precio ($)") },
+                    leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+
+                OutlinedTextField(
+                    value = quantityText,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() } && input.length <= 3) {
+                            quantityText = input
+                        }
+                    },
+                    label = { Text("Cantidad de copias") },
+                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onDeleteClick,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    enabled = !isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Eliminar")
+                }
+
+                Button(
+                    onClick = {
+                        val price = priceText.toIntOrNull() ?: -1
+                        val qty = quantityText.toIntOrNull() ?: 0
+                        if (price < 0) {
+                            errorMessage = "Ingresa un precio válido"
+                            return@Button
+                        }
+                        if (qty <= 0) {
+                            errorMessage = "Ingresa una cantidad mayor a 0"
+                            return@Button
+                        }
+
+                        isLoading = true
+                        errorMessage = null
+                        onConfirmUpdate(selectedCondition, selectedLanguage, price, qty) { success, msg ->
+                            isLoading = false
+                            if (success) {
+                                onDismissRequest()
+                            } else {
+                                errorMessage = msg ?: "Error al actualizar la carta"
+                            }
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Guardar")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismissRequest,
+                enabled = !isLoading
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditWishlistCardDialog(
+    card: GetWishlistResponse.WishlistCard,
+    onDismissRequest: () -> Unit,
+    onConfirmUpdate: (String, String, Int, (Boolean, String?) -> Unit) -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val conditions = remember {
+        listOf(
+            "PERFECTA",
+            "RECIEN_ABIERTA",
+            "DESGASTE_MENOR",
+            "DESGASTE_VISIBLE",
+            "DESGASTE_SEVERO",
+            "DAÑADA",
+            "DESTRUIDA"
+        )
+    }
+
+    val languages = remember {
+        listOf(
+            "Inglés",
+            "Japonés",
+            "Español",
+            "Francés",
+            "Alemán",
+            "Italiano",
+            "Portugués",
+            "Coreano",
+            "Chino"
+        )
+    }
+
+    var selectedMinCondition by remember { mutableStateOf(card.minimumCondition ?: conditions[0]) }
+    var selectedLanguage by remember { mutableStateOf(card.language ?: languages[0]) }
+    var quantityText by remember { mutableStateOf(card.quantity?.toString() ?: "1") }
+
+    var expandedConditionDropdown by remember { mutableStateOf(false) }
+    var expandedLanguageDropdown by remember { mutableStateOf(false) }
+
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val imageModel = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismissRequest() },
+        title = {
+            Text(
+                text = "Editar Carta de Lista de Deseos",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CardImageThumbnail(
+                            model = imageModel,
+                            contentDescription = card.cardName,
+                            modifier = Modifier.size(50.dp, 70.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = card.cardName.orEmpty(),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${card.tcg.orEmpty()} • ${card.set.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedConditionDropdown,
+                    onExpandedChange = { if (!isLoading) expandedConditionDropdown = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedMinCondition,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Estado mínimo aceptado") },
+                        leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedConditionDropdown) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        enabled = !isLoading
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedConditionDropdown,
+                        onDismissRequest = { expandedConditionDropdown = false }
+                    ) {
+                        conditions.forEach { cond ->
+                            DropdownMenuItem(
+                                text = { Text(cond) },
+                                onClick = {
+                                    selectedMinCondition = cond
+                                    expandedConditionDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedLanguageDropdown,
+                    onExpandedChange = { if (!isLoading) expandedLanguageDropdown = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedLanguage,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Idioma") },
+                        leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedLanguageDropdown) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        enabled = !isLoading
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedLanguageDropdown,
+                        onDismissRequest = { expandedLanguageDropdown = false }
+                    ) {
+                        languages.forEach { lang ->
+                            DropdownMenuItem(
+                                text = { Text(lang) },
+                                onClick = {
+                                    selectedLanguage = lang
+                                    expandedLanguageDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = quantityText,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() } && input.length <= 3) {
+                            quantityText = input
+                        }
+                    },
+                    label = { Text("Cantidad deseada") },
+                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onDeleteClick,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    enabled = !isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Eliminar")
+                }
+
+                Button(
+                    onClick = {
+                        val qty = quantityText.toIntOrNull() ?: 0
+                        if (qty <= 0) {
+                            errorMessage = "Ingresa una cantidad mayor a 0"
+                            return@Button
+                        }
+
+                        isLoading = true
+                        errorMessage = null
+                        onConfirmUpdate(selectedMinCondition, selectedLanguage, qty) { success, msg ->
+                            isLoading = false
+                            if (success) {
+                                onDismissRequest()
+                            } else {
+                                errorMessage = msg ?: "Error al actualizar la carta"
+                            }
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Guardar")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismissRequest,
+                enabled = !isLoading
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun ConfirmDeleteCardDialog(
+    cardName: String,
+    onDismissRequest: () -> Unit,
+    onConfirmDelete: ((Boolean, String?) -> Unit) -> Unit
+) {
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismissRequest() },
+        title = {
+            Text(
+                text = "Eliminar Carta",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "¿Estás seguro de que deseas eliminar \"$cardName\"? Esta acción no se puede deshacer.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                errorMessage?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    isLoading = true
+                    errorMessage = null
+                    onConfirmDelete { success, msg ->
+                        isLoading = false
+                        if (success) {
+                            onDismissRequest()
+                        } else {
+                            errorMessage = msg ?: "Error al eliminar la carta"
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                ),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onError,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Eliminar")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismissRequest,
+                enabled = !isLoading
+            ) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

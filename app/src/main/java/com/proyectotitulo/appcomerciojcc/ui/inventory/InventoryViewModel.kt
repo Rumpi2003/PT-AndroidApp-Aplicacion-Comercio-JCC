@@ -120,4 +120,92 @@ class InventoryViewModel : ViewModel() {
             loadWishlist(forceRefresh = true, sortBy = sortBy, sortOrder = sortOrder)
         }
     }
+
+    fun patchInventoryCard(
+        inventoryCardId: Int,
+        condition: String,
+        language: String,
+        price: Int,
+        quantity: Int,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.patchInventoryCard(
+                inventoryCardId = inventoryCardId,
+                condition = condition,
+                language = language,
+                price = price,
+                quantity = quantity
+            )
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    loadInventory(forceRefresh = true)
+                    onResult(true, response.message)
+                } else {
+                    onResult(false, response.errors?.firstOrNull() ?: response.message)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al actualizar la carta")
+            }
+        }
+    }
+
+    fun deleteInventoryCard(inventoryCardId: Int, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.deleteInventoryCard(inventoryCardId)
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    loadInventory(forceRefresh = true)
+                    onResult(true, response.message)
+                } else {
+                    onResult(false, response.errors?.firstOrNull() ?: response.message)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al eliminar la carta")
+            }
+        }
+    }
+
+    fun patchWishlistCard(
+        wishlistCardId: Int,
+        minimumCondition: String,
+        language: String,
+        quantity: Int,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.patchWishlistCard(
+                wishlistCardId = wishlistCardId,
+                condition = minimumCondition,
+                language = language,
+                quantity = quantity
+            )
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    loadWishlist(forceRefresh = true)
+                    onResult(true, response.message)
+                } else {
+                    onResult(false, response.errors?.firstOrNull() ?: response.message)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al actualizar la lista de deseos")
+            }
+        }
+    }
+
+    fun deleteWishlistCard(wishlistCardId: Int, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.deleteWishlistCard(wishlistCardId)
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    loadWishlist(forceRefresh = true)
+                    onResult(true, response.message)
+                } else {
+                    onResult(false, response.errors?.firstOrNull() ?: response.message)
+                }
+            }.onFailure { error ->
+                onResult(false, error.message ?: "Error al eliminar de la lista de deseos")
+            }
+        }
+    }
 }

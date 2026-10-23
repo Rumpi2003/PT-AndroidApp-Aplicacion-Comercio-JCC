@@ -5,13 +5,20 @@ import com.proyectotitulo.appcomerciojcc.domain.models.AddInventoryCardRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.AddInventoryCardResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.AddWishlistCardRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.AddWishlistCardResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.DeleteInventoryCardResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.DeleteWishlistCardResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetWishlistResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.PatchInventoryCardRequest
+import com.proyectotitulo.appcomerciojcc.domain.models.PatchInventoryCardResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.PatchWishlistCardResponse
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -104,5 +111,77 @@ class InventoryRepository {
         }
     }
 
+    suspend fun patchInventoryCard(
+        inventoryCardId: Int,
+        condition: String? = null,
+        language: String? = null,
+        price: Int? = null,
+        quantity: Int? = null
+    ): Result<PatchInventoryCardResponse> {
+        return try {
+            val response: PatchInventoryCardResponse = client.patch("${KtorApiClient.BASE_URL}/inventario/ofrecidas/$inventoryCardId") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    PatchInventoryCardRequest(
+                        condition = condition,
+                        language = language,
+                        price = price,
+                        quantity = quantity
+                    )
+                )
+            }.body()
 
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteInventoryCard(inventoryCardId: Int): Result<DeleteInventoryCardResponse> {
+        return try {
+            val response: DeleteInventoryCardResponse = client.delete("${KtorApiClient.BASE_URL}/inventario/ofrecidas/$inventoryCardId").body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun patchWishlistCard(
+        wishlistCardId: Int,
+        condition: String? = null,
+        language: String? = null,
+        quantity: Int? = null
+    ): Result<PatchWishlistCardResponse> {
+        return try {
+            val response: PatchWishlistCardResponse = client.patch("${KtorApiClient.BASE_URL}/inventario/deseadas/$wishlistCardId") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    PatchInventoryCardRequest(
+                        condition = condition,
+                        language = language,
+                        quantity = quantity
+                    )
+                )
+            }.body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteWishlistCard(wishlistCardId: Int): Result<DeleteWishlistCardResponse> {
+        return try {
+            val response: DeleteWishlistCardResponse = client.delete("${KtorApiClient.BASE_URL}/inventario/deseadas/$wishlistCardId").body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
 }
