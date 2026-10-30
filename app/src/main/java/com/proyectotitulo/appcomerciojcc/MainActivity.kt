@@ -26,6 +26,7 @@ import com.proyectotitulo.appcomerciojcc.data.local.SessionManager
 import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.ui.components.AppBottomBar
 import com.proyectotitulo.appcomerciojcc.ui.home.HomeScreen
+import com.proyectotitulo.appcomerciojcc.ui.home.HomeViewModel
 import com.proyectotitulo.appcomerciojcc.ui.inventory.InventoryScreen
 import com.proyectotitulo.appcomerciojcc.ui.inventory.InventoryViewModel
 import com.proyectotitulo.appcomerciojcc.ui.navigation.HomeRoute
@@ -53,12 +54,24 @@ class MainActivity : ComponentActivity() {
             AppComercioJCCTheme {
                 val navController = rememberNavController()
 
+                val homeViewModel: HomeViewModel = viewModel()
+                val inventoryViewModel: InventoryViewModel = viewModel()
+                val searchViewModel: SearchViewModel = viewModel()
+                val profileViewModel: ProfileViewModel = viewModel()
+
                 KtorApiClient.onUnauthorized = {
                     runOnUiThread {
-                        sessionManager.clearSession()
-                        KtorApiClient.token = null
-                        navController.navigate(LoginRoute) {
-                            popUpTo(0) { inclusive = true}
+                        homeViewModel.disableGeoModeOnLogout {
+                            sessionManager.clearSession()
+                            KtorApiClient.token = null
+
+                            inventoryViewModel.clearData()
+                            profileViewModel.clearData()
+                            searchViewModel.clearData()
+
+                            navController.navigate(LoginRoute) {
+                                popUpTo(0) { inclusive = true}
+                            }
                         }
                     }
                 }
@@ -93,6 +106,15 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(RegisterRoute)
                                 },
                                 onLoginSuccess = {
+                                    homeViewModel.clearData()
+                                    inventoryViewModel.clearData()
+                                    profileViewModel.clearData()
+                                    searchViewModel.clearData()
+
+                                    homeViewModel.loadInitialGeoMode()
+                                    inventoryViewModel.loadInventory(forceRefresh = true)
+                                    profileViewModel.loadProfile(forceRefresh = true)
+
                                     navController.navigate(HomeRoute) {
                                         popUpTo(LoginRoute) { inclusive = true }
                                     }
@@ -111,21 +133,27 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<InventoryRoute> {
-                            val inventoryViewModel: InventoryViewModel = viewModel()
                             InventoryScreen(
                                 viewModel = inventoryViewModel
                             )
                         }
 
                         composable<SearchRoute> {
-                            val searchViewModel: SearchViewModel = viewModel()
                             SearchScreen(
-                                viewModel = searchViewModel
+                                viewModel = searchViewModel,
+                                onCardAddedToInventory = {
+                                    inventoryViewModel.loadInventory(forceRefresh = true)
+                                },
+                                onCardAddedToWishlist = {
+                                    inventoryViewModel.loadWishlist(forceRefresh = true)
+                                }
                             )
                         }
 
                         composable<HomeRoute> {
-                            HomeScreen()
+                            HomeScreen(
+                                viewModel = homeViewModel
+                            )
                         }
 
                         composable<TradeRoute> {
@@ -133,14 +161,20 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<ProfileRoute> {
-                            val profileViewModel: ProfileViewModel = viewModel()
                             ProfileScreen(
                                 viewModel = profileViewModel,
                                 onLogout = {
-                                    sessionManager.clearSession()
-                                    KtorApiClient.token = null
-                                    navController.navigate(LoginRoute) {
-                                        popUpTo(0) { inclusive = true }
+                                    homeViewModel.disableGeoModeOnLogout {
+                                        sessionManager.clearSession()
+                                        KtorApiClient.token = null
+
+                                        inventoryViewModel.clearData()
+                                        profileViewModel.clearData()
+                                        searchViewModel.clearData()
+
+                                        navController.navigate(LoginRoute) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
                                     }
                                 }
                             )

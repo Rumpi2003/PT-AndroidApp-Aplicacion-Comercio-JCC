@@ -179,4 +179,8 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun clearData() {
+        _uiState.value = ProfileUiState.Loading
+    }
 }

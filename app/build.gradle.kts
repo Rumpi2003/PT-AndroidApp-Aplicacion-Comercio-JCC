@@ -6,14 +6,12 @@ plugins {
 
 android {
     namespace = "com.proyectotitulo.appcomerciojcc"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.proyectotitulo.appcomerciojcc"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -47,6 +45,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation("io.socket:socket.io-client:2.1.0")
+
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")

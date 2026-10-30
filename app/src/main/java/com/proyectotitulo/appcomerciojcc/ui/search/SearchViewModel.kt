@@ -261,4 +261,8 @@ class SearchViewModel : ViewModel() {
             }
         }
     }
+
+    fun clearData() {
+        _uiState.value = SearchUiState()
+    }
 }

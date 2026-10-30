@@ -76,12 +76,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetSetsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTcgsResponse.TCG
@@ -93,7 +91,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchScreen(
     modifier: Modifier = Modifier,
-    viewModel: SearchViewModel
+    viewModel: SearchViewModel,
+    onCardAddedToInventory: () -> Unit = {},
+    onCardAddedToWishlist: () -> Unit = {}
 ) {
 
     val uiState by viewModel.uiState.observeAsState(initial = SearchUiState())
@@ -163,6 +163,7 @@ fun SearchScreen(
                         viewModel.addInventoryCard(cardId, condition, language, price, quantity) { success, msg ->
                             onResult(success, msg)
                             if (success) {
+                                onCardAddedToInventory()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
                                         message = msg ?: "Carta añadida al inventario con éxito"
@@ -175,6 +176,7 @@ fun SearchScreen(
                         viewModel.addWishlistCard(cardId, minCondition, language, quantity) { success, msg ->
                             onResult(success, msg)
                             if (success) {
+                                onCardAddedToWishlist()
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
                                         message = msg ?: "Carta añadida a la lista de deseos con éxito"

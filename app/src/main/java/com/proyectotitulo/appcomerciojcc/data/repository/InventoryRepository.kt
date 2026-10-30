@@ -12,6 +12,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetWishlistResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.PatchInventoryCardRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.PatchInventoryCardResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.PatchWishlistCardRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.PatchWishlistCardResponse
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
@@ -151,7 +152,7 @@ class InventoryRepository {
 
     suspend fun patchWishlistCard(
         wishlistCardId: Int,
-        condition: String? = null,
+        minimumCondition: String? = null,
         language: String? = null,
         quantity: Int? = null
     ): Result<PatchWishlistCardResponse> {
@@ -159,8 +160,8 @@ class InventoryRepository {
             val response: PatchWishlistCardResponse = client.patch("${KtorApiClient.BASE_URL}/inventario/deseadas/$wishlistCardId") {
                 contentType(ContentType.Application.Json)
                 setBody(
-                    PatchInventoryCardRequest(
-                        condition = condition,
+                    PatchWishlistCardRequest(
+                        minimumCondition = minimumCondition,
                         language = language,
                         quantity = quantity
                     )

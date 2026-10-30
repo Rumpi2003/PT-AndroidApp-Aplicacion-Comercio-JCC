@@ -43,6 +43,7 @@ object KtorApiClient {
                 prettyPrint = true
                 isLenient = true
                 ignoreUnknownKeys = true
+                encodeDefaults = true
             })
         }
 

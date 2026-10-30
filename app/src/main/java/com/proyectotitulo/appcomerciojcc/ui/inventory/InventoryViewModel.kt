@@ -35,19 +35,32 @@ class InventoryViewModel : ViewModel() {
         _uiState.value = _uiState.value?.copy(isGridView = !currentMode)
     }
 
-    fun loadInventory(forceRefresh: Boolean = false, sortBy: String? = "nombre_carta", sortOrder: String? = "ASC") {
+    fun loadInventory(forceRefresh: Boolean = false, sortBy: String? = null, sortOrder: String? = null) {
         val currentState = _uiState.value ?: InventoryUiState()
-        if (!forceRefresh && currentState.inventoryCards.isNotEmpty()) {
+        val activeSortBy = sortBy ?: currentState.inventorySortBy
+        val activeSortOrder = sortOrder ?: currentState.inventorySortOrder
+
+        if (!forceRefresh && currentState.inventoryCards.isNotEmpty() && sortBy == null && sortOrder == null) {
             return
         }
 
         viewModelScope.launch {
             if (forceRefresh) {
-                _uiState.value = currentState.copy(isRefreshing = true, errors = null)
+                _uiState.value = currentState.copy(
+                    isRefreshing = true,
+                    inventorySortBy = activeSortBy,
+                    inventorySortOrder = activeSortOrder,
+                    errors = null
+                )
             } else {
-                _uiState.value = currentState.copy(isLoadingInventory = true, errors = null)
+                _uiState.value = currentState.copy(
+                    isLoadingInventory = true,
+                    inventorySortBy = activeSortBy,
+                    inventorySortOrder = activeSortOrder,
+                    errors = null
+                )
             }
-            val result = repository.getInventory(sortBy = sortBy, sortOrder = sortOrder)
+            val result = repository.getInventory(sortBy = activeSortBy, sortOrder = activeSortOrder)
             val latestState = _uiState.value ?: InventoryUiState()
             result.onSuccess { response ->
                 if (response.status == "success") {
@@ -73,19 +86,32 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
-    fun loadWishlist(forceRefresh: Boolean = false, sortBy: String? = "nombre_carta", sortOrder: String? = "ASC") {
+    fun loadWishlist(forceRefresh: Boolean = false, sortBy: String? = null, sortOrder: String? = null) {
         val currentState = _uiState.value ?: InventoryUiState()
-        if (!forceRefresh && currentState.wishlistCards.isNotEmpty()) {
+        val activeSortBy = sortBy ?: currentState.wishlistSortBy
+        val activeSortOrder = sortOrder ?: currentState.wishlistSortOrder
+
+        if (!forceRefresh && currentState.wishlistCards.isNotEmpty() && sortBy == null && sortOrder == null) {
             return
         }
 
         viewModelScope.launch {
             if (forceRefresh) {
-                _uiState.value = currentState.copy(isRefreshing = true, errors = null)
+                _uiState.value = currentState.copy(
+                    isRefreshing = true,
+                    wishlistSortBy = activeSortBy,
+                    wishlistSortOrder = activeSortOrder,
+                    errors = null
+                )
             } else {
-                _uiState.value = currentState.copy(isLoadingWishlist = true, errors = null)
+                _uiState.value = currentState.copy(
+                    isLoadingWishlist = true,
+                    wishlistSortBy = activeSortBy,
+                    wishlistSortOrder = activeSortOrder,
+                    errors = null
+                )
             }
-            val result = repository.getWishlist(sortBy = sortBy, sortOrder = sortOrder)
+            val result = repository.getWishlist(sortBy = activeSortBy, sortOrder = activeSortOrder)
             val latestState = _uiState.value ?: InventoryUiState()
 
             result.onSuccess { response ->
@@ -176,7 +202,7 @@ class InventoryViewModel : ViewModel() {
         viewModelScope.launch {
             val result = repository.patchWishlistCard(
                 wishlistCardId = wishlistCardId,
-                condition = minimumCondition,
+                minimumCondition = minimumCondition,
                 language = language,
                 quantity = quantity
             )
@@ -207,5 +233,9 @@ class InventoryViewModel : ViewModel() {
                 onResult(false, error.message ?: "Error al eliminar de la lista de deseos")
             }
         }
+    }
+
+    fun clearData() {
+        _uiState.value = InventoryUiState()
     }
 }
