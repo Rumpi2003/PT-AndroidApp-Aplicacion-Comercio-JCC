@@ -187,6 +187,159 @@ data class UpdateLocationResponse(
     )
 }
 
+@Serializable
+data class GetTradeInventoryResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: List<Card>? = null,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Card(
+        @SerialName("id_carta_ofrecida")
+        val inventoryCardId: Int? = null,
+        @SerialName("id_tipo_carta")
+        val cardId: Int? = null,
+        @SerialName("nombre_carta")
+        val cardName: String? = null,
+        @SerialName("rareza")
+        val rarity: String? = null,
+        @SerialName("set")
+        val set: String? = null,
+        @SerialName("url_imagen")
+        val imageUrl: String? = null,
+        @SerialName("url_miniatura")
+        val miniatureUrl: String? = null,
+        @SerialName("franquicia")
+        val tcg: String? = null,
+        @SerialName("estado")
+        val condition: String? = null,
+        @SerialName("idioma")
+        val language: String? = null,
+        @SerialName("precio")
+        val price: Int? = null,
+        @SerialName("stock_disponible")
+        val availableStock: Int? = null,
+        @SerialName("en_lista_deseos")
+        val inWishlist: Boolean? = null,
+        @SerialName("cantidad_deseada")
+        val desiredAmount: Int? = null
+    )
+}
+
+@Serializable
+data class PostTransactionRequest(
+    @SerialName("id_usuario_destino")
+    val otherUserId: Int,
+    @SerialName("solicitadas")
+    val solicitedCards: List<SolicitedCard>,
+    @SerialName("ofrecidas")
+    val offeredCards: List<OfferedCard>
+) {
+    @Serializable
+    data class SolicitedCard(
+        @SerialName("id_carta_ofrecida")
+        val inventoryCardId: Int,
+        @SerialName("cantidad")
+        val quantity: Int,
+        @SerialName("precio_ofertado")
+        val offeredPrice: Int
+    )
+
+    @Serializable
+    data class OfferedCard(
+        @SerialName("id_carta_ofrecida")
+        val inventoryCardId: Int,
+        @SerialName("cantidad")
+        val quantity: Int
+    )
+}
+
+@Serializable
+data class PostTransactionResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: Data? = null,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Data(
+        @SerialName("id_transaccion")
+        val transactionId: Int,
+        @SerialName("id_usuario_1")
+        val userId: Int,
+        @SerialName("id_usuario_2")
+        val otherUserId: Int,
+        @SerialName("estado")
+        val transactionState: String,
+        @SerialName("fecha_creacion")
+        val creationDate: String,
+        @SerialName("diferencia_a_pagar_1")
+        val userDifferential: Int,
+        @SerialName("diferencia_a_pagar_2")
+        val otherUserDifferential: Int,
+        @SerialName("deudor")
+        val debtorId: Int,
+        @SerialName("solicitadas")
+        val solicitedCards: List<SolicitedCard>,
+        @SerialName("ofrecidas")
+        val offeredCards: List<OfferedCard>
+    ) {
+        @Serializable
+        data class SolicitedCard(
+            @SerialName("id_carta_ofrecida")
+            val inventoryCardId: Int,
+            @SerialName("cantidad")
+            val quantity: Int,
+            @SerialName("precio_acordado")
+            val agreedUponPrice: Int
+        )
+
+        @Serializable
+        data class OfferedCard(
+            @SerialName("id_carta_ofrecida")
+            val inventoryCardId: Int,
+            @SerialName("cantidad")
+            val quantity: Int,
+            @SerialName("precio_acordado")
+            val agreedUponPrice: Int
+        )
+    }
+}
+
+data class SelectedSolicitedCard(
+    val card: GetTradeInventoryResponse.Card,
+    val quantity: Int = 1,
+    val offeredPrice: Int = card.price ?: 0
+)
+
+data class SelectedOfferedCard(
+    val card: GetTradeInventoryResponse.Card,
+    val quantity: Int = 1
+)
+
+data class TransactionState(
+    val isOpen: Boolean = false,
+    val step: Int = 1, // 1 = Solicitadas, 2 = Ofrecidas, 3 = Resumen, 4 = Resultado
+    val targetUser: GetMatchmakingResponse.Data.Result.User? = null,
+    val otherUserInventory: List<GetTradeInventoryResponse.Card> = emptyList(),
+    val myInventory: List<GetTradeInventoryResponse.Card> = emptyList(),
+    val selectedSolicitedCards: Map<Int, SelectedSolicitedCard> = emptyMap(),
+    val selectedOfferedCards: Map<Int, SelectedOfferedCard> = emptyMap(),
+    val isLoadingInventories: Boolean = false,
+    val isSubmittingTransaction: Boolean = false,
+    val transactionSuccessMessage: String? = null,
+    val transactionError: String? = null
+)
+
 data class HomeUiState(
     val isAllOffersMode: Boolean = false,
     val recommendations: List<GetMatchmakingResponse.Data.Result> = emptyList(),
@@ -194,9 +347,11 @@ data class HomeUiState(
     val currentPage: Int = 1,
     val limitPerPage: Int = 5,
     val useGeolocation: Boolean = false,
+    val useUserCommune: Boolean = false,
     val isLoading: Boolean = false,
     val isLoadingNextPage: Boolean = false,
     val isLoadingGeoMode: Boolean = false,
     val isRefreshing: Boolean = false,
-    val errors: List<String>? = null
+    val errors: List<String>? = null,
+    val transactionState: TransactionState = TransactionState()
 )

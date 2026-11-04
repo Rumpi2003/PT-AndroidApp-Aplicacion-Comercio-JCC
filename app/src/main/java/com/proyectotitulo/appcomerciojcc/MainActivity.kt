@@ -39,6 +39,7 @@ import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileViewModel
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchScreen
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 import com.proyectotitulo.appcomerciojcc.ui.trade.TradeScreen
+import com.proyectotitulo.appcomerciojcc.ui.trade.TradeViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
                 val inventoryViewModel: InventoryViewModel = viewModel()
                 val searchViewModel: SearchViewModel = viewModel()
                 val profileViewModel: ProfileViewModel = viewModel()
+                val tradeViewModel: TradeViewModel = viewModel()
 
                 KtorApiClient.onUnauthorized = {
                     runOnUiThread {
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
                             inventoryViewModel.clearData()
                             profileViewModel.clearData()
                             searchViewModel.clearData()
+                            tradeViewModel.clearData()
 
                             navController.navigate(LoginRoute) {
                                 popUpTo(0) { inclusive = true}
@@ -110,10 +113,12 @@ class MainActivity : ComponentActivity() {
                                     inventoryViewModel.clearData()
                                     profileViewModel.clearData()
                                     searchViewModel.clearData()
+                                    tradeViewModel.clearData()
 
                                     homeViewModel.loadInitialGeoMode()
                                     inventoryViewModel.loadInventory(forceRefresh = true)
                                     profileViewModel.loadProfile(forceRefresh = true)
+                                    tradeViewModel.loadActiveTransactions(forceRefresh = true)
 
                                     navController.navigate(HomeRoute) {
                                         popUpTo(LoginRoute) { inclusive = true }
@@ -157,7 +162,9 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<TradeRoute> {
-                            TradeScreen()
+                            TradeScreen(
+                                viewModel = tradeViewModel
+                            )
                         }
 
                         composable<ProfileRoute> {
@@ -171,6 +178,7 @@ class MainActivity : ComponentActivity() {
                                         inventoryViewModel.clearData()
                                         profileViewModel.clearData()
                                         searchViewModel.clearData()
+                                        tradeViewModel.clearData()
 
                                         navController.navigate(LoginRoute) {
                                             popUpTo(0) { inclusive = true }
