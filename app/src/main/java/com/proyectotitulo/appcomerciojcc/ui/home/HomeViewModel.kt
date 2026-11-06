@@ -12,9 +12,6 @@ import com.proyectotitulo.appcomerciojcc.domain.models.PostTransactionRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.SelectedOfferedCard
 import com.proyectotitulo.appcomerciojcc.domain.models.SelectedSolicitedCard
 import com.proyectotitulo.appcomerciojcc.domain.models.TransactionState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class HomeViewModel : ViewModel() {
@@ -24,64 +21,47 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableLiveData<HomeUiState>(HomeUiState())
     val uiState: LiveData<HomeUiState> = _uiState
 
-    private var locationTimerJob: Job? = null
-
     init {
-        loadInitialGeoMode()
+        loadRecommendations()
     }
 
     fun loadInitialGeoMode() {
         viewModelScope.launch {
-            _uiState.value = (_uiState.value ?: HomeUiState()).copy(isLoading = true, errors = null)
-
             val geoResult = repository.getGeoMode()
-            var isGeoActive = false
+            val currentState = _uiState.value ?: HomeUiState()
 
             geoResult.onSuccess { response ->
                 if (response.status == "success") {
-                    isGeoActive = response.data?.geoMode ?: false
+                    val geoModeActive = response.data?.geoMode == true
+                    _uiState.value = currentState.copy(useGeolocation = geoModeActive)
+                    if (geoModeActive) {
+                        loadRecommendations(forceRefresh = true)
+                    }
                 }
             }
-
-            _uiState.value = (_uiState.value ?: HomeUiState()).copy(useGeolocation = isGeoActive)
-            loadRecommendations(forceRefresh = true, overrideUseGeo = isGeoActive)
         }
     }
 
-    fun loadRecommendations(forceRefresh: Boolean = false, overrideUseGeo: Boolean? = null) {
+    fun loadRecommendations(forceRefresh: Boolean = false) {
         val currentState = _uiState.value ?: HomeUiState()
-        val activeUseGeo = overrideUseGeo ?: currentState.useGeolocation
-        val activeUserCommune = if (activeUseGeo) false else currentState.useUserCommune
-
         if (!forceRefresh && currentState.recommendations.isNotEmpty()) {
             return
         }
 
-        val limit = if (currentState.isAllOffersMode) 10 else 5
-
         viewModelScope.launch {
-            if (forceRefresh && !currentState.isLoading) {
-                _uiState.value = currentState.copy(
-                    isRefreshing = true,
-                    useGeolocation = activeUseGeo,
-                    useUserCommune = activeUserCommune,
-                    errors = null
-                )
+            if (forceRefresh) {
+                _uiState.value = currentState.copy(isRefreshing = true, errors = null)
             } else {
-                _uiState.value = currentState.copy(
-                    isLoading = true,
-                    useGeolocation = activeUseGeo,
-                    useUserCommune = activeUserCommune,
-                    errors = null
-                )
+                _uiState.value = currentState.copy(isLoading = true, errors = null)
             }
 
             val result = repository.getMatchmaking(
-                limit = limit,
+                limit = 5,
                 offset = 0,
-                useGeolocation = activeUseGeo,
-                userCommune = activeUserCommune
+                useGeolocation = currentState.useGeolocation,
+                userCommune = currentState.useUserCommune
             )
+
             val latestState = _uiState.value ?: HomeUiState()
 
             result.onSuccess { response ->
@@ -89,10 +69,6 @@ class HomeViewModel : ViewModel() {
                     _uiState.value = latestState.copy(
                         recommendations = response.data?.results ?: emptyList(),
                         totalRecommendations = response.data?.total ?: 0,
-                        currentPage = 1,
-                        limitPerPage = limit,
-                        useGeolocation = activeUseGeo,
-                        useUserCommune = activeUserCommune,
                         isLoading = false,
                         isRefreshing = false
                     )
@@ -107,121 +83,201 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = latestState.copy(
                     isLoading = false,
                     isRefreshing = false,
-                    errors = listOf(error.message ?: "Error al cargar las recomendaciones")
+                    errors = listOf(error.message ?: "Error de red al cargar recomendaciones")
                 )
             }
         }
     }
 
-    fun toggleGeoMode(
-        newGeoMode: Boolean,
-        onRequestLocation: (((Float, Float) -> Unit) -> Unit)
-    ) {
+    fun loadAllOffers(forceRefresh: Boolean = false) {
         val currentState = _uiState.value ?: HomeUiState()
 
         viewModelScope.launch {
-            _uiState.value = currentState.copy(isLoadingGeoMode = true, errors = null)
+            if (forceRefresh) {
+                _uiState.value = currentState.copy(
+                    isAllOffersMode = true,
+                    isLoading = true,
+                    errors = null
+                )
+            } else {
+                _uiState.value = currentState.copy(
+                    isLoading = true,
+                    errors = null
+                )
+            }
 
-            val result = repository.updateGeoMode(newGeoMode)
+            val result = repository.getMatchmaking(
+                limit = 50,
+                offset = 0,
+                useGeolocation = currentState.useGeolocation,
+                userCommune = currentState.useUserCommune
+            )
+
+            val latestState = _uiState.value ?: HomeUiState()
 
             result.onSuccess { response ->
                 if (response.status == "success") {
-                    val enabled = response.data?.geoMode ?: newGeoMode
-                    _uiState.value = (_uiState.value ?: HomeUiState()).copy(
-                        useGeolocation = enabled,
-                        useUserCommune = if (enabled) false else currentState.useUserCommune,
-                        isLoadingGeoMode = false
+                    _uiState.value = latestState.copy(
+                        recommendations = response.data?.results ?: emptyList(),
+                        totalRecommendations = response.data?.total ?: 0,
+                        isLoading = false,
+                        isRefreshing = false
                     )
-
-                    if (enabled) {
-                        onRequestLocation { lat, lng ->
-                            sendLocationAndUpdateMatchmaking(lat, lng)
-                        }
-                        startPeriodicLocationTimer(onRequestLocation)
-                    } else {
-                        stopPeriodicLocationTimer()
-                        loadRecommendations(forceRefresh = true, overrideUseGeo = false)
-                    }
                 } else {
-                    _uiState.value = (_uiState.value ?: HomeUiState()).copy(
-                        isLoadingGeoMode = false,
+                    _uiState.value = latestState.copy(
+                        isLoading = false,
+                        isRefreshing = false,
                         errors = response.errors ?: listOf(response.message)
                     )
                 }
             }.onFailure { error ->
-                _uiState.value = (_uiState.value ?: HomeUiState()).copy(
-                    isLoadingGeoMode = false,
-                    errors = listOf(error.message ?: "Error al actualizar el modo de geolocalización")
+                _uiState.value = latestState.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    errors = listOf(error.message ?: "Error de red al cargar todas las ofertas")
                 )
             }
         }
     }
 
-    fun toggleUserCommune(enabled: Boolean) {
-        val currentState = _uiState.value ?: HomeUiState()
-        if (currentState.useGeolocation) return
-
-        _uiState.value = currentState.copy(useUserCommune = enabled)
+    fun exitAllOffersMode() {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            isAllOffersMode = false
+        )
         loadRecommendations(forceRefresh = true)
     }
 
-    fun sendLocationAndUpdateMatchmaking(latitude: Float, longitude: Float) {
-        viewModelScope.launch {
-            repository.updateLocation(latitude, longitude)
-            loadRecommendations(forceRefresh = true, overrideUseGeo = true)
+    fun toggleUserCommuneFilter(enabled: Boolean) {
+        val currentState = _uiState.value ?: return
+        if (currentState.useGeolocation) return
+
+        _uiState.value = currentState.copy(useUserCommune = enabled)
+
+        if (currentState.isAllOffersMode) {
+            loadAllOffers(forceRefresh = true)
+        } else {
+            loadRecommendations(forceRefresh = true)
         }
     }
 
-    private fun startPeriodicLocationTimer(onRequestLocation: (((Float, Float) -> Unit) -> Unit)) {
-        stopPeriodicLocationTimer()
-        locationTimerJob = viewModelScope.launch {
-            while (isActive && _uiState.value?.useGeolocation == true) {
-                delay(60_000) // 1 minuto
-                if (_uiState.value?.useGeolocation == true) {
-                    onRequestLocation { lat, lng ->
-                        viewModelScope.launch {
-                            repository.updateLocation(lat, lng)
-                        }
-                    }
+    fun toggleGeolocationFilter(enabled: Boolean, onNeedsPermission: () -> Unit) {
+        val currentState = _uiState.value ?: return
+
+        if (enabled) {
+            onNeedsPermission()
+        } else {
+            viewModelScope.launch {
+                repository.updateGeoMode(false)
+                val latest = _uiState.value ?: HomeUiState()
+                _uiState.value = latest.copy(useGeolocation = false)
+
+                if (latest.isAllOffersMode) {
+                    loadAllOffers(forceRefresh = true)
+                } else {
+                    loadRecommendations(forceRefresh = true)
                 }
             }
         }
     }
 
-    private fun stopPeriodicLocationTimer() {
-        locationTimerJob?.cancel()
-        locationTimerJob = null
+    fun sendLocationAndUpdateMatchmaking(latitude: Float, longitude: Float) {
+        viewModelScope.launch {
+            val currentState = _uiState.value ?: HomeUiState()
+            _uiState.value = currentState.copy(isLoading = true, errors = null)
+
+            // 1. Primero activar el modo geolocalización en el servidor
+            val geoModeResult = repository.updateGeoMode(true)
+
+            geoModeResult.onSuccess { geoResponse ->
+                if (geoResponse.status == "success") {
+                    // 2. Una vez activo el modo geo, enviar las coordenadas GPS
+                    val locationResult = repository.updateLocation(latitude, longitude)
+
+                    locationResult.onSuccess { locResponse ->
+                        if (locResponse.status == "success") {
+                            val latest = _uiState.value ?: HomeUiState()
+                            _uiState.value = latest.copy(
+                                useGeolocation = true,
+                                useUserCommune = false,
+                                isLoading = false
+                            )
+
+                            if (latest.isAllOffersMode) {
+                                loadAllOffers(forceRefresh = true)
+                            } else {
+                                loadRecommendations(forceRefresh = true)
+                            }
+                        } else {
+                            repository.updateGeoMode(false)
+                            val latest = _uiState.value ?: HomeUiState()
+                            _uiState.value = latest.copy(
+                                useGeolocation = false,
+                                isLoading = false,
+                                errors = locResponse.errors ?: listOf(locResponse.message)
+                            )
+                        }
+                    }.onFailure { error ->
+                        repository.updateGeoMode(false)
+                        val latest = _uiState.value ?: HomeUiState()
+                        _uiState.value = latest.copy(
+                            useGeolocation = false,
+                            isLoading = false,
+                            errors = listOf(error.message ?: "Error al enviar ubicación GPS")
+                        )
+                    }
+                } else {
+                    repository.updateGeoMode(false)
+                    val latest = _uiState.value ?: HomeUiState()
+                    _uiState.value = latest.copy(
+                        useGeolocation = false,
+                        isLoading = false,
+                        errors = geoResponse.errors ?: listOf(geoResponse.message)
+                    )
+                }
+            }.onFailure { error ->
+                repository.updateGeoMode(false)
+                val latest = _uiState.value ?: HomeUiState()
+                _uiState.value = latest.copy(
+                    useGeolocation = false,
+                    isLoading = false,
+                    errors = listOf(error.message ?: "Error al activar modo geolocalización")
+                )
+            }
+        }
     }
 
-    fun openTransactionDialog(user: GetMatchmakingResponse.Data.Result.User) {
-        val userId = user.userId ?: return
-        _uiState.value = _uiState.value?.copy(
+    fun disableGeoModeOnLogout(onComplete: () -> Unit) {
+        _uiState.value = (_uiState.value ?: HomeUiState()).copy(useGeolocation = false)
+        onComplete()
+    }
+
+    fun openTransactionDialog(targetUser: GetMatchmakingResponse.Data.Result.User) {
+        val otherUserId = targetUser.userId ?: return
+        val currentState = _uiState.value ?: HomeUiState()
+
+        _uiState.value = currentState.copy(
             transactionState = TransactionState(
                 isOpen = true,
                 step = 1,
-                targetUser = user,
+                targetUser = targetUser,
                 isLoadingInventories = true
             )
         )
-        fetchTransactionInventories(userId)
+
+        fetchTransactionInventories(otherUserId)
     }
 
     fun fetchTransactionInventories(otherUserId: Int) {
         viewModelScope.launch {
             val currentState = _uiState.value ?: HomeUiState()
-            _uiState.value = currentState.copy(
-                transactionState = currentState.transactionState.copy(
-                    isLoadingInventories = true,
-                    transactionError = null
-                )
-            )
 
             val otherInvResult = repository.getOtherInventory(otherUserId)
             val myInvResult = repository.getMyInventory(otherUserId)
 
+            var errorMessage: String? = null
             var otherInv: List<GetTradeInventoryResponse.Card> = emptyList()
             var myInv: List<GetTradeInventoryResponse.Card> = emptyList()
-            var errorMessage: String? = null
 
             otherInvResult.onSuccess { response ->
                 if (response.status == "success") {
@@ -230,7 +286,7 @@ class HomeViewModel : ViewModel() {
                     errorMessage = response.errors?.firstOrNull() ?: response.message
                 }
             }.onFailure { error ->
-                errorMessage = error.message ?: "Error al cargar inventario del ofertador"
+                errorMessage = error.message ?: "Error al cargar inventario del usuario"
             }
 
             myInvResult.onSuccess { response ->
@@ -291,7 +347,7 @@ class HomeViewModel : ViewModel() {
         )
     }
 
-    fun updateSolicitedCardOfferedPrice(inventoryCardId: Int, price: Int) {
+    fun updateSolicitedCardPrice(inventoryCardId: Int, price: Int) {
         val currentState = _uiState.value ?: return
         val txState = currentState.transactionState
         val item = txState.selectedSolicitedCards[inventoryCardId] ?: return
@@ -344,7 +400,7 @@ class HomeViewModel : ViewModel() {
         )
     }
 
-    fun submitTransaction() {
+    fun submitTransaction(onSuccess: () -> Unit = {}) {
         val currentState = _uiState.value ?: return
         val txState = currentState.transactionState
         val otherUserId = txState.targetUser?.userId ?: return
@@ -388,8 +444,8 @@ class HomeViewModel : ViewModel() {
                             step = 4
                         )
                     )
-                    // Recargar emparejamiento inmediatamente tras éxito de transacción
                     loadRecommendations(forceRefresh = true)
+                    onSuccess()
                 } else {
                     _uiState.value = latest.copy(
                         transactionState = latest.transactionState.copy(
@@ -409,12 +465,6 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun retryTransaction() {
-        val currentState = _uiState.value ?: return
-        val targetUser = currentState.transactionState.targetUser ?: return
-        openTransactionDialog(targetUser)
-    }
-
     fun closeTransactionDialog() {
         val currentState = _uiState.value ?: return
         val wasSuccess = currentState.transactionState.step == 4 && currentState.transactionState.transactionSuccessMessage != null
@@ -424,111 +474,15 @@ class HomeViewModel : ViewModel() {
         )
 
         if (wasSuccess) {
-            loadRecommendations(forceRefresh = true)
-        }
-    }
-
-    fun disableGeoModeOnLogout(onComplete: () -> Unit) {
-        stopPeriodicLocationTimer()
-        val isGeoActive = _uiState.value?.useGeolocation == true
-        if (isGeoActive) {
-            viewModelScope.launch {
-                try {
-                    repository.updateGeoMode(false)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    clearData()
-                    onComplete()
-                }
-            }
-        } else {
-            clearData()
-            onComplete()
-        }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopPeriodicLocationTimer()
-        if (_uiState.value?.useGeolocation == true) {
-            viewModelScope.launch {
-                try {
-                    repository.updateGeoMode(false)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-    }
-
-    fun switchToAllOffersMode() {
-        val currentState = _uiState.value ?: HomeUiState()
-        _uiState.value = currentState.copy(
-            isAllOffersMode = true,
-            limitPerPage = 10,
-            currentPage = 1,
-            isLoading = true
-        )
-        loadRecommendations(forceRefresh = true)
-    }
-
-    fun exitAllOffersMode() {
-        val currentState = _uiState.value ?: HomeUiState()
-        _uiState.value = currentState.copy(
-            isAllOffersMode = false,
-            limitPerPage = 5,
-            currentPage = 1,
-            isLoading = true
-        )
-        loadRecommendations(forceRefresh = true)
-    }
-
-    fun loadNextPage() {
-        val currentState = _uiState.value ?: return
-        if (currentState.isLoadingNextPage || currentState.recommendations.size >= currentState.totalRecommendations) {
-            return
-        }
-
-        val nextOffset = currentState.recommendations.size
-
-        viewModelScope.launch {
-            _uiState.value = currentState.copy(isLoadingNextPage = true, errors = null)
-
-            val result = repository.getMatchmaking(
-                limit = currentState.limitPerPage,
-                offset = nextOffset,
-                useGeolocation = currentState.useGeolocation,
-                userCommune = if (currentState.useGeolocation) false else currentState.useUserCommune
-            )
-
-            result.onSuccess { response ->
-                val latest = _uiState.value ?: HomeUiState()
-                if (response.status == "success") {
-                    val newItems = response.data?.results ?: emptyList()
-                    _uiState.value = latest.copy(
-                        recommendations = latest.recommendations + newItems,
-                        totalRecommendations = response.data?.total ?: latest.totalRecommendations,
-                        isLoadingNextPage = false
-                    )
-                } else {
-                    _uiState.value = latest.copy(
-                        isLoadingNextPage = false,
-                        errors = response.errors ?: listOf(response.message)
-                    )
-                }
-            }.onFailure { error ->
-                val latest = _uiState.value ?: HomeUiState()
-                _uiState.value = latest.copy(
-                    isLoadingNextPage = false,
-                    errors = listOf(error.message ?: "Error al cargar más ofertas")
-                )
+            if (currentState.isAllOffersMode) {
+                loadAllOffers(forceRefresh = true)
+            } else {
+                loadRecommendations(forceRefresh = true)
             }
         }
     }
 
     fun clearData() {
-        stopPeriodicLocationTimer()
         _uiState.value = HomeUiState()
     }
 }

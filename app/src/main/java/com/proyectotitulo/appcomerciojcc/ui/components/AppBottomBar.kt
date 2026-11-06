@@ -1,6 +1,5 @@
 package com.proyectotitulo.appcomerciojcc.ui.components
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -11,11 +10,9 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -51,8 +48,7 @@ fun AppBottomBar(navController: NavController) {
     val currentDestination = navBackStackEntry?.destination
 
     NavigationBar(
-        modifier = Modifier.height(80.dp),
-        windowInsets = WindowInsets(0, 0, 0, 0)
+        modifier = Modifier.height(92.dp)
     ) {
         items.forEach { item ->
             val isSelected = currentDestination?.hierarchy?.any {
@@ -62,7 +58,7 @@ fun AppBottomBar(navController: NavController) {
             NavigationBarItem(
                 selected = isSelected,
                 label = null,
-                icon = { Icon(item.icon, contentDescription =  item.label) },
+                icon = { Icon(item.icon, contentDescription = item.label) },
                 onClick = {
                     navController.navigate(item.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
@@ -72,7 +68,6 @@ fun AppBottomBar(navController: NavController) {
                         restoreState = true
                     }
                 }
-
             )
         }
     }

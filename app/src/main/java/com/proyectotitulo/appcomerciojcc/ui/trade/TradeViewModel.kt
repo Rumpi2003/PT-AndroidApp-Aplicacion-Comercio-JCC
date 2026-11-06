@@ -4,27 +4,67 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.proyectotitulo.appcomerciojcc.data.remote.SocketChatManager
 import com.proyectotitulo.appcomerciojcc.data.repository.MatchmakingRepository
+import com.proyectotitulo.appcomerciojcc.data.repository.ProfileRepository
 import com.proyectotitulo.appcomerciojcc.data.repository.TradeRepository
+import com.proyectotitulo.appcomerciojcc.domain.models.CancelConfirmationState
+import com.proyectotitulo.appcomerciojcc.domain.models.ChatState
+import com.proyectotitulo.appcomerciojcc.domain.models.GetMessageHistoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTradeInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTransactionsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.NegotiationState
+import com.proyectotitulo.appcomerciojcc.domain.models.PendingSummaryState
 import com.proyectotitulo.appcomerciojcc.domain.models.PutCounterOfferRequest
+import com.proyectotitulo.appcomerciojcc.domain.models.ReviewState
 import com.proyectotitulo.appcomerciojcc.domain.models.SelectedNegotiationOfferedCard
 import com.proyectotitulo.appcomerciojcc.domain.models.SelectedNegotiationSolicitedCard
 import com.proyectotitulo.appcomerciojcc.domain.models.TradeUiState
+import com.proyectotitulo.appcomerciojcc.domain.models.WaitingRoomState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class TradeViewModel : ViewModel() {
 
     private val repository = TradeRepository()
     private val matchmakingRepository = MatchmakingRepository()
+    private val profileRepository = ProfileRepository()
+    private val socketChatManager = SocketChatManager()
 
     private val _uiState = MutableLiveData<TradeUiState>(TradeUiState())
     val uiState: LiveData<TradeUiState> = _uiState
 
+    private var pollingWaitingRoomJob: Job? = null
+
     init {
+        setupGlobalSocket()
         loadActiveTransactions()
+    }
+
+    private fun setupGlobalSocket() {
+        socketChatManager.ensureGlobalConnection(
+            onTransactionStatusChanged = { txId, estado ->
+                onSocketTransactionStatusChanged(txId, estado)
+            }
+        )
+    }
+
+    private fun onSocketTransactionStatusChanged(txId: Int, estado: String) {
+        val currentState = _uiState.value ?: return
+        val waiting = currentState.waitingRoomState
+
+        if (estado == "COMPLETADA") {
+            if (waiting.isOpen && waiting.transactionId == txId) {
+                pollingWaitingRoomJob?.cancel()
+                _uiState.value = currentState.copy(
+                    waitingRoomState = WaitingRoomState(isOpen = false)
+                )
+                verifyCompletionAndCheckReview(txId, waiting.counterpartUsername, waiting.otherUserId)
+            } else {
+                loadActiveTransactions(forceRefresh = true)
+            }
+        }
     }
 
     fun loadActiveTransactions(forceRefresh: Boolean = false) {
@@ -119,6 +159,362 @@ class TradeViewModel : ViewModel() {
         }
     }
 
+    fun completeTransaction(transactionId: Int, counterpartUsername: String, counterpartUserId: Int) {
+        setupGlobalSocket()
+
+        viewModelScope.launch {
+            val result = repository.completeTransaction(transactionId)
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val counterpartConfirmed = response.data?.counterpartConfirmed == true
+                    val transactionState = response.data?.transactionState.orEmpty()
+                    val otherUserId = counterpartUserId
+
+                    val isFirstToConfirm = !counterpartConfirmed && transactionState != "COMPLETADA"
+
+                    if (isFirstToConfirm) {
+                        _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                            waitingRoomState = WaitingRoomState(
+                                isOpen = true,
+                                transactionId = transactionId,
+                                counterpartUsername = counterpartUsername,
+                                otherUserId = otherUserId
+                            )
+                        )
+                        startWaitingRoomPolling(transactionId, counterpartUsername, otherUserId)
+                    } else {
+                        pollingWaitingRoomJob?.cancel()
+                        _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                            waitingRoomState = WaitingRoomState(isOpen = false)
+                        )
+                        verifyCompletionAndCheckReview(transactionId, counterpartUsername, otherUserId)
+                    }
+                } else {
+                    _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                        errors = response.errors ?: listOf(response.message)
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                    errors = listOf(error.message ?: "Error al completar la transacción")
+                )
+            }
+        }
+    }
+
+    private fun startWaitingRoomPolling(transactionId: Int, counterpartUsername: String, otherUserId: Int) {
+        pollingWaitingRoomJob?.cancel()
+        pollingWaitingRoomJob = viewModelScope.launch {
+            while (true) {
+                delay(3000)
+                val currentState = _uiState.value ?: break
+                if (!currentState.waitingRoomState.isOpen || currentState.waitingRoomState.transactionId != transactionId) {
+                    break
+                }
+
+                val txResult = repository.getTransactions(transactionId)
+                txResult.onSuccess { response ->
+                    val data = response.data
+                    val state = data?.transactionState.orEmpty()
+                    val confirmed = data?.counterpartConfirmed == true
+
+                    if (state == "COMPLETADA" || confirmed) {
+                        pollingWaitingRoomJob?.cancel()
+                        _uiState.value = currentState.copy(
+                            waitingRoomState = WaitingRoomState(isOpen = false)
+                        )
+                        verifyCompletionAndCheckReview(transactionId, counterpartUsername, otherUserId)
+                    }
+                }
+            }
+        }
+    }
+
+    fun withdrawCompleteTransaction() {
+        pollingWaitingRoomJob?.cancel()
+        val currentState = _uiState.value ?: return
+        val waiting = currentState.waitingRoomState
+        if (!waiting.isOpen) return
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(
+                waitingRoomState = waiting.copy(isWithdrawing = true)
+            )
+
+            repository.withdrawCompleteTransaction(waiting.transactionId)
+
+            val latest = _uiState.value ?: TradeUiState()
+            _uiState.value = latest.copy(
+                waitingRoomState = WaitingRoomState(isOpen = false)
+            )
+            loadActiveTransactions(forceRefresh = true)
+        }
+    }
+
+    fun verifyCompletionAndCheckReview(transactionId: Int, counterpartUsername: String, otherUserId: Int) {
+        viewModelScope.launch {
+            val result = repository.getTransactions(transactionId)
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val details = response.data
+                    val myReview = details?.myReview
+
+                    if (myReview == null) {
+                        _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                            reviewState = ReviewState(
+                                isOpen = true,
+                                isAskToEditOpen = false,
+                                transactionId = transactionId,
+                                otherUserId = otherUserId,
+                                counterpartUsername = counterpartUsername,
+                                score = 5,
+                                comment = "",
+                                isEditingExisting = false
+                            )
+                        )
+                    } else {
+                        _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+                            reviewState = ReviewState(
+                                isOpen = false,
+                                isAskToEditOpen = true,
+                                transactionId = transactionId,
+                                otherUserId = otherUserId,
+                                counterpartUsername = counterpartUsername,
+                                score = myReview.score ?: 5,
+                                comment = myReview.content.orEmpty(),
+                                isEditingExisting = true
+                            )
+                        )
+                    }
+                }
+                loadActiveTransactions(forceRefresh = true)
+            }.onFailure {
+                loadActiveTransactions(forceRefresh = true)
+            }
+        }
+    }
+
+    fun proceedToEditExistingReview() {
+        val currentState = _uiState.value ?: return
+        val review = currentState.reviewState
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(
+                reviewState = review.copy(
+                    isAskToEditOpen = false,
+                    isOpen = true,
+                    isLoadingReview = true
+                )
+            )
+
+            val result = repository.getMyReview(review.otherUserId)
+            val latest = _uiState.value ?: TradeUiState()
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    val r = response.data
+                    _uiState.value = latest.copy(
+                        reviewState = latest.reviewState.copy(
+                            score = r?.score ?: 5,
+                            comment = r?.content.orEmpty(),
+                            isLoadingReview = false
+                        )
+                    )
+                } else {
+                    _uiState.value = latest.copy(
+                        reviewState = latest.reviewState.copy(isLoadingReview = false)
+                    )
+                }
+            }.onFailure {
+                _uiState.value = latest.copy(
+                    reviewState = latest.reviewState.copy(isLoadingReview = false)
+                )
+            }
+        }
+    }
+
+    fun updateReviewScore(score: Int) {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            reviewState = currentState.reviewState.copy(score = score.coerceIn(1, 5))
+        )
+    }
+
+    fun updateReviewComment(comment: String) {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            reviewState = currentState.reviewState.copy(comment = comment.take(255))
+        )
+    }
+
+    fun submitReview() {
+        val currentState = _uiState.value ?: return
+        val review = currentState.reviewState
+
+        if (review.isSubmittingReview) return
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(
+                reviewState = review.copy(isSubmittingReview = true, reviewError = null)
+            )
+
+            val result = repository.putReview(
+                otherUserId = review.otherUserId,
+                score = review.score,
+                content = review.comment.trim()
+            )
+
+            val latest = _uiState.value ?: TradeUiState()
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    _uiState.value = latest.copy(
+                        reviewState = latest.reviewState.copy(
+                            isSubmittingReview = false,
+                            reviewSuccessMessage = response.message ?: "¡Reseña enviada con éxito!"
+                        )
+                    )
+                    loadActiveTransactions(forceRefresh = true)
+                } else {
+                    _uiState.value = latest.copy(
+                        reviewState = latest.reviewState.copy(
+                            isSubmittingReview = false,
+                            reviewError = response.errors?.firstOrNull() ?: response.message
+                        )
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = latest.copy(
+                    reviewState = latest.reviewState.copy(
+                        isSubmittingReview = false,
+                        reviewError = error.message ?: "Error al enviar la reseña"
+                    )
+                )
+            }
+        }
+    }
+
+    fun closeReviewState() {
+        _uiState.value = (_uiState.value ?: TradeUiState()).copy(
+            reviewState = ReviewState()
+        )
+        loadActiveTransactions(forceRefresh = true)
+    }
+
+    fun openPendingSummary(transactionId: Int) {
+        val currentState = _uiState.value ?: TradeUiState()
+        _uiState.value = currentState.copy(
+            pendingSummaryState = PendingSummaryState(
+                isOpen = true,
+                transactionId = transactionId,
+                isLoading = true
+            )
+        )
+
+        viewModelScope.launch {
+            val result = repository.getTransactions(transactionId)
+            val latest = _uiState.value ?: TradeUiState()
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    _uiState.value = latest.copy(
+                        pendingSummaryState = latest.pendingSummaryState.copy(
+                            details = response.data,
+                            isLoading = false
+                        )
+                    )
+                } else {
+                    _uiState.value = latest.copy(
+                        pendingSummaryState = latest.pendingSummaryState.copy(
+                            isLoading = false,
+                            error = response.errors?.firstOrNull() ?: response.message
+                        )
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = latest.copy(
+                    pendingSummaryState = latest.pendingSummaryState.copy(
+                        isLoading = false,
+                        error = error.message ?: "Error al cargar resumen"
+                    )
+                )
+            }
+        }
+    }
+
+    fun closePendingSummary() {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            pendingSummaryState = PendingSummaryState(isOpen = false)
+        )
+    }
+
+    fun openCancelConfirmation(transactionId: Int, counterpartUsername: String) {
+        val currentState = _uiState.value ?: TradeUiState()
+        _uiState.value = currentState.copy(
+            cancelState = CancelConfirmationState(
+                isOpen = true,
+                transactionId = transactionId,
+                counterpartUsername = counterpartUsername
+            )
+        )
+    }
+
+    fun confirmCancelTransaction() {
+        val currentState = _uiState.value ?: return
+        val cancel = currentState.cancelState
+        val txId = cancel.transactionId
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(
+                cancelState = cancel.copy(isCanceling = true, errorMessage = null)
+            )
+
+            val result = repository.cancelTransaction(txId)
+            val latest = _uiState.value ?: TradeUiState()
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    _uiState.value = latest.copy(
+                        cancelState = latest.cancelState.copy(
+                            isCanceling = false,
+                            successMessage = response.message ?: "¡Transacción cancelada exitosamente!"
+                        )
+                    )
+                    loadActiveTransactions(forceRefresh = true)
+                } else {
+                    _uiState.value = latest.copy(
+                        cancelState = latest.cancelState.copy(
+                            isCanceling = false,
+                            errorMessage = response.errors?.firstOrNull() ?: response.message
+                        )
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.value = latest.copy(
+                    cancelState = latest.cancelState.copy(
+                        isCanceling = false,
+                        errorMessage = error.message ?: "Error al cancelar la transacción"
+                    )
+                )
+            }
+        }
+    }
+
+    fun closeCancelConfirmation() {
+        val currentState = _uiState.value ?: return
+        val wasSuccess = currentState.cancelState.successMessage != null
+
+        _uiState.value = currentState.copy(
+            cancelState = CancelConfirmationState(isOpen = false)
+        )
+
+        if (wasSuccess) {
+            loadActiveTransactions(forceRefresh = true)
+        }
+    }
+
     fun openNegotiationDialog(transactionId: Int, counterpart: GetTransactionsResponse.Data.Result.Counterpart) {
         val otherUserId = counterpart.userId ?: return
         val currentState = _uiState.value ?: TradeUiState()
@@ -171,7 +567,6 @@ class TradeViewModel : ViewModel() {
                 }
             }
 
-            // Mapear cartas actualmente involucradas en la transacción
             val solicitedMap = mutableMapOf<Int, SelectedNegotiationSolicitedCard>()
             val offeredMap = mutableMapOf<Int, SelectedNegotiationOfferedCard>()
 
@@ -511,6 +906,189 @@ class TradeViewModel : ViewModel() {
         }
     }
 
+    // Funciones del Chat Socket.IO
+    fun openChat(transactionId: Int, counterpartUsername: String, counterpartUserId: Int) {
+        viewModelScope.launch {
+            val currentState = _uiState.value ?: TradeUiState()
+
+            val profileResult = profileRepository.getPrivateProfile()
+            var myUserId = 0
+            profileResult.onSuccess { response ->
+                if (response.status == "success") {
+                    myUserId = response.data?.userId ?: 0
+                }
+            }
+
+            _uiState.value = currentState.copy(
+                chatState = ChatState(
+                    isOpen = true,
+                    transactionId = transactionId,
+                    counterpartUsername = counterpartUsername,
+                    counterpartUserId = counterpartUserId,
+                    currentUserId = myUserId,
+                    isLoadingHistory = true,
+                    chatError = null
+                )
+            )
+
+            val historyResult = repository.getMessageHistory(transactionId)
+            var historyMessages: List<GetMessageHistoryResponse.Message> = emptyList()
+
+            historyResult.onSuccess { response ->
+                if (response.status == "success") {
+                    historyMessages = response.data ?: emptyList()
+                }
+            }
+
+            val latest = _uiState.value ?: TradeUiState()
+            _uiState.value = latest.copy(
+                chatState = latest.chatState.copy(
+                    messages = historyMessages,
+                    isLoadingHistory = false
+                )
+            )
+
+            socketChatManager.setListeners(
+                onNewMessage = { newMsg ->
+                    onNewSocketMessageReceived(newMsg)
+                },
+                onMessagesRead = { hastaMsgId ->
+                    onSocketMessagesRead(hastaMsgId)
+                },
+                onChatClosed = {
+                    onSocketChatClosed()
+                },
+                onTransactionStatusChanged = { txId, estado ->
+                    onSocketTransactionStatusChanged(txId, estado)
+                }
+            )
+
+            socketChatManager.joinChatRoom(
+                transactionId = transactionId,
+                onConnected = {
+                    val unreadFromOther = historyMessages.filter { it.senderId != myUserId && it.isRead != true }
+                    val maxUnreadId = unreadFromOther.mapNotNull { it.messageId }.maxOrNull()
+                    if (maxUnreadId != null) {
+                        socketChatManager.markAsRead(transactionId, maxUnreadId)
+                    }
+                }
+            )
+        }
+    }
+
+    private fun onNewSocketMessageReceived(newMsg: GetMessageHistoryResponse.Message) {
+        val currentState = _uiState.value ?: return
+        val chat = currentState.chatState
+
+        val isDuplicate = chat.messages.any { existing ->
+            (newMsg.messageId != null && existing.messageId == newMsg.messageId) ||
+            (newMsg.messageId == null && existing.senderId == newMsg.senderId && existing.content == newMsg.content)
+        }
+
+        if (isDuplicate) return
+
+        val updatedMessages = chat.messages + newMsg
+
+        _uiState.value = currentState.copy(
+            chatState = chat.copy(messages = updatedMessages)
+        )
+
+        if (newMsg.senderId != chat.currentUserId && newMsg.messageId != null) {
+            socketChatManager.markAsRead(chat.transactionId, newMsg.messageId)
+        }
+    }
+
+    private fun onSocketMessagesRead(hastaMsgId: Int) {
+        val currentState = _uiState.value ?: return
+        val chat = currentState.chatState
+
+        val updatedMessages = chat.messages.map { msg ->
+            if (msg.senderId == chat.currentUserId && (msg.messageId ?: 0) <= hastaMsgId) {
+                msg.copy(isRead = true)
+            } else {
+                msg
+            }
+        }
+
+        _uiState.value = currentState.copy(
+            chatState = chat.copy(messages = updatedMessages)
+        )
+    }
+
+    private fun onSocketChatClosed() {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            chatState = currentState.chatState.copy(isChatClosed = true)
+        )
+    }
+
+    fun updateChatInput(newInput: String) {
+        val currentState = _uiState.value ?: return
+        _uiState.value = currentState.copy(
+            chatState = currentState.chatState.copy(inputContent = newInput)
+        )
+    }
+
+    fun sendMessage() {
+        val currentState = _uiState.value ?: return
+        val chat = currentState.chatState
+        val content = chat.inputContent.trim()
+
+        if (content.length !in 1..255 || chat.isSending || chat.isChatClosed) return
+
+        _uiState.value = currentState.copy(
+            chatState = chat.copy(isSending = true, chatError = null)
+        )
+
+        socketChatManager.sendMessage(
+            transactionId = chat.transactionId,
+            content = content,
+            onSuccess = { sentMessage ->
+                val latest = _uiState.value ?: return@sendMessage
+                val currentMsgs = latest.chatState.messages
+
+                val isDuplicate = sentMessage != null && currentMsgs.any { existing ->
+                    (sentMessage.messageId != null && existing.messageId == sentMessage.messageId) ||
+                    (existing.senderId == sentMessage.senderId && existing.content == sentMessage.content)
+                }
+
+                val updatedMsgs = if (sentMessage != null && !isDuplicate) {
+                    currentMsgs + sentMessage
+                } else {
+                    currentMsgs
+                }
+
+                _uiState.value = latest.copy(
+                    chatState = latest.chatState.copy(
+                        messages = updatedMsgs,
+                        inputContent = "",
+                        isSending = false
+                    )
+                )
+            },
+            onError = { error ->
+                val latest = _uiState.value ?: return@sendMessage
+                _uiState.value = latest.copy(
+                    chatState = latest.chatState.copy(
+                        isSending = false,
+                        chatError = error
+                    )
+                )
+            }
+        )
+    }
+
+    fun closeChat() {
+        val currentState = _uiState.value ?: return
+        val txId = currentState.chatState.transactionId
+
+        socketChatManager.leaveRoom(txId)
+
+        _uiState.value = currentState.copy(
+            chatState = ChatState(isOpen = false)
+        )
+    }
+
     fun switchToHistoryView() {
         _uiState.value = (_uiState.value ?: TradeUiState()).copy(
             isHistoryView = true,
@@ -590,6 +1168,14 @@ class TradeViewModel : ViewModel() {
     }
 
     fun clearData() {
+        pollingWaitingRoomJob?.cancel()
+        socketChatManager.disconnect()
         _uiState.value = TradeUiState()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        pollingWaitingRoomJob?.cancel()
+        socketChatManager.disconnect()
     }
 }

@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -72,7 +74,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -87,17 +88,24 @@ import com.proyectotitulo.appcomerciojcc.domain.models.GetTradeInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.HomeUiState
 import com.proyectotitulo.appcomerciojcc.domain.models.TransactionState
 import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
+import java.util.Locale
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    onTransactionCreated: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = HomeUiState())
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
+    // Interceptar el botón físico/gesto Atrás del teléfono al estar en modo "Todas las Ofertas"
+    BackHandler(enabled = uiState.isAllOffersMode) {
+        viewModel.exitAllOffersMode()
+    }
 
     val requestLocationAndSend: ((Float, Float) -> Unit) -> Unit = { onLocationObtained ->
         fetchLocation(context, fusedLocationClient, onLocationObtained)
@@ -130,40 +138,36 @@ fun HomeScreen(
     ) {
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
-            onRefresh = { viewModel.loadRecommendations(forceRefresh = true) },
+            onRefresh = {
+                if (uiState.isAllOffersMode) {
+                    viewModel.loadAllOffers(forceRefresh = true)
+                } else {
+                    viewModel.loadRecommendations(forceRefresh = true)
+                }
+            },
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     isAllOffersMode = uiState.isAllOffersMode,
                     totalOffers = uiState.totalRecommendations,
                     onBackClick = { viewModel.exitAllOffersMode() }
                 )
 
-                GeoModeSwitchCard(
-                    useGeolocation = uiState.useGeolocation,
+                FilterSwitchesSection(
                     useUserCommune = uiState.useUserCommune,
-                    isLoadingGeoMode = uiState.isLoadingGeoMode,
-                    onGeoModeToggle = { newGeoMode ->
-                        if (newGeoMode) {
-                            if (hasLocationPermission(context)) {
-                                viewModel.toggleGeoMode(true, requestLocationAndSend)
-                            } else {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
+                    useGeolocation = uiState.useGeolocation,
+                    isCommuneSwitchEnabled = !uiState.useGeolocation,
+                    onUserCommuneToggle = { enabled -> viewModel.toggleUserCommuneFilter(enabled) },
+                    onGeolocationToggle = { enabled ->
+                        viewModel.toggleGeolocationFilter(enabled) {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
                                 )
-                            }
-                        } else {
-                            viewModel.toggleGeoMode(false, requestLocationAndSend)
+                            )
                         }
-                    },
-                    onUserCommuneToggle = { enabled ->
-                        viewModel.toggleUserCommune(enabled)
                     }
                 )
 
@@ -177,88 +181,55 @@ fun HomeScreen(
                 } else if (uiState.errors != null) {
                     ErrorContent(
                         errors = uiState.errors,
-                        onRetry = { viewModel.loadRecommendations(forceRefresh = true) }
-                    )
-                } else if (uiState.recommendations.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "No se encontraron ofertas de intercambio disponibles.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.secondary,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { viewModel.loadRecommendations(forceRefresh = true) },
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Recargar consultas")
+                        onRetry = {
+                            if (uiState.isAllOffersMode) {
+                                viewModel.loadAllOffers(forceRefresh = true)
+                            } else {
+                                viewModel.loadRecommendations(forceRefresh = true)
                             }
                         }
-                    }
+                    )
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(uiState.recommendations) { result ->
-                            MatchmakingCardItem(
-                                result = result,
-                                useGeolocation = uiState.useGeolocation,
-                                onClick = {
-                                    result.user?.let { user ->
+                    val currentList = uiState.recommendations
+
+                    if (currentList.isEmpty()) {
+                        EmptyContent(
+                            isAllOffersMode = uiState.isAllOffersMode,
+                            useUserCommune = uiState.useUserCommune,
+                            useGeolocation = uiState.useGeolocation,
+                            onRefresh = {
+                                if (uiState.isAllOffersMode) {
+                                    viewModel.loadAllOffers(forceRefresh = true)
+                                } else {
+                                    viewModel.loadRecommendations(forceRefresh = true)
+                                }
+                            }
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(currentList) { result ->
+                                MatchmakingCardItem(
+                                    result = result,
+                                    onInitiateTransaction = { user ->
                                         viewModel.openTransactionDialog(user)
                                     }
-                                }
-                            )
-                        }
-
-                        if (!uiState.isAllOffersMode && uiState.totalRecommendations > 5) {
-                            item {
-                                OutlinedButton(
-                                    onClick = { viewModel.switchToAllOffersMode() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    shape = MaterialTheme.shapes.medium
-                                ) {
-                                    Text("Ver todas las ofertas (${uiState.totalRecommendations} ofertas)")
-                                }
+                                )
                             }
-                        }
 
-                        if (uiState.isAllOffersMode && uiState.recommendations.size < uiState.totalRecommendations) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (uiState.isLoadingNextPage) {
-                                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                    } else {
-                                        OutlinedButton(
-                                            onClick = { viewModel.loadNextPage() }
-                                        ) {
-                                            Text("Cargar más ofertas")
-                                        }
+                            // Mostrar el botón de ver todas las ofertas sólo si no estamos en el modo de todas las ofertas y hay más de 5
+                            if (!uiState.isAllOffersMode && uiState.totalRecommendations > 5) {
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { viewModel.loadAllOffers(forceRefresh = true) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = MaterialTheme.shapes.medium
+                                    ) {
+                                        Text("Ver todas las ofertas (${uiState.totalRecommendations} ofertas)")
                                     }
                                 }
                             }
@@ -268,36 +239,37 @@ fun HomeScreen(
             }
         }
 
-        // Diálogo multinivel de creación de transacción
         if (uiState.transactionState.isOpen) {
-            CreateTransactionDialog(
+            TransactionDialog(
                 viewModel = viewModel,
-                txState = uiState.transactionState
+                txState = uiState.transactionState,
+                onTransactionCreated = onTransactionCreated
             )
         }
     }
 }
 
 @Composable
-fun GeoModeSwitchCard(
-    useGeolocation: Boolean,
+fun FilterSwitchesSection(
     useUserCommune: Boolean,
-    isLoadingGeoMode: Boolean,
-    onGeoModeToggle: (Boolean) -> Unit,
-    onUserCommuneToggle: (Boolean) -> Unit
+    useGeolocation: Boolean,
+    isCommuneSwitchEnabled: Boolean,
+    onUserCommuneToggle: (Boolean) -> Unit,
+    onGeolocationToggle: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -313,46 +285,35 @@ fun GeoModeSwitchCard(
                         imageVector = Icons.Default.Radar,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Modo Geolocalización",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "Modo Geolocalización GPS",
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = if (useGeolocation) "Buscar ofertas por cercanía (GPS activo)" else "Búsqueda estándar desactivada",
+                            text = "Busca ofertas en tu radio de distancia actual",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
 
-                if (isLoadingGeoMode) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
+                Switch(
+                    checked = useGeolocation,
+                    onCheckedChange = onGeolocationToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.secondary
                     )
-                } else {
-                    Switch(
-                        checked = useGeolocation,
-                        onCheckedChange = onGeoModeToggle,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary,
-                            uncheckedTrackColor = MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                }
+                )
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-            val isCommuneSwitchEnabled = !useGeolocation && !isLoadingGeoMode
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -367,15 +328,13 @@ fun GeoModeSwitchCard(
                         imageVector = Icons.Default.LocationCity,
                         contentDescription = null,
                         tint = if (isCommuneSwitchEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Solo mi comuna",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "Filtro por Comuna Registrada",
+                            style = MaterialTheme.typography.titleSmall,
                             color = if (isCommuneSwitchEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                         )
                         Text(
@@ -454,26 +413,30 @@ fun HomeHeader(
 @Composable
 fun MatchmakingCardItem(
     result: GetMatchmakingResponse.Data.Result,
-    useGeolocation: Boolean,
-    onClick: () -> Unit = {}
+    onInitiateTransaction: (GetMatchmakingResponse.Data.Result.User) -> Unit
 ) {
-    val primaryCard = result.matchingCards?.firstOrNull()
-    val locale = LocalConfiguration.current.locales[0]
+    val username = result.user?.username ?: "Usuario"
+    val averageScore = result.user?.averageScore ?: 0f
+    val filledStars = averageScore.toInt().coerceIn(0, 5)
+    val matchingCards = result.matchingCards ?: emptyList()
+    val firstCard = matchingCards.firstOrNull()
+    val reciprocatedUnits = result.summary?.reciprocatedUnits ?: 0
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Cabecera: Avatar, Username, Puntuación de 5 Estrellas y Distancia
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -482,7 +445,7 @@ fun MatchmakingCardItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
@@ -491,7 +454,7 @@ fun MatchmakingCardItem(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
 
@@ -499,134 +462,134 @@ fun MatchmakingCardItem(
 
                     Column {
                         Text(
-                            text = result.user?.username ?: "Ofertador",
+                            text = "@$username",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = "Puntuación",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${result.user?.averageScore ?: 0.0f}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
+                            if (averageScore > 0) {
+                                repeat(5) { index ->
+                                    val icon = if (index < filledStars) Icons.Default.Star else Icons.Default.StarOutline
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = String.format(Locale.getDefault(), "%.1f", averageScore),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            } else {
+                                Text(
+                                    text = "Sin calificaciones",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+
+                            result.distance?.let { m ->
+                                val km = m / 1000f
+                                Text(
+                                    text = " • ${String.format(Locale.getDefault(), "%.1f", km)} km",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
 
-                if (useGeolocation && result.distance != null) {
-                    val distKm = result.distance / 1000.0
-                    val rawDistStr = if (result.distance < 1000) "${result.distance} m" else String.format(locale, "%.1f km", distKm)
-                    val formattedDist = if (result.distanceAprox == true) "a menos de $rawDistStr" else "a $rawDistStr"
-
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(formattedDist, style = MaterialTheme.typography.labelSmall) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            labelColor = MaterialTheme.colorScheme.primary
+                result.user?.let { targetUser ->
+                    Button(
+                        onClick = { onInitiateTransaction(targetUser) },
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Ofertar")
+                    }
                 }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CardImageThumbnail(
-                    model = primaryCard?.miniatureUrl?.takeIf { it.isNotBlank() } ?: primaryCard?.imageUrl,
-                    contentDescription = primaryCard?.cardName,
-                    modifier = Modifier.size(70.dp, 100.dp)
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+            // Primera Carta Coincidente que ofrece el otro usuario y que buscas
+            if (firstCard != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = primaryCard?.cardName ?: "Sin nombre de carta",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    CardImageThumbnail(
+                        model = firstCard.miniatureUrl?.takeIf { it.isNotBlank() } ?: firstCard.imageUrl,
+                        contentDescription = firstCard.cardName,
+                        modifier = Modifier.size(45.dp, 65.dp)
                     )
 
-                    Text(
-                        text = "Set: ${primaryCard?.set.orEmpty()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                    Text(
-                        text = "Estado: ${primaryCard?.condition.orEmpty()} (${primaryCard?.language.orEmpty()})",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = firstCard.cardName.orEmpty(),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${firstCard.set.orEmpty()} • ${firstCard.condition.orEmpty()} (${firstCard.language.orEmpty()})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = "Stock: ${firstCard.quantity ?: 1} | Precio: $${firstCard.price ?: 0}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
+                if (matchingCards.size > 1) {
                     Text(
-                        text = "Copias: ${primaryCard?.quantity ?: 1}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-
-                    Text(
-                        text = "$${primaryCard?.price ?: 0}",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        text = "+ ${matchingCards.size - 1} cartas más que buscas de este usuario",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
+            } else {
+                Text(
+                    text = "No se encontraron cartas en común directamente.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
 
-            val otherMatchingCardsCount = (result.matchingCards?.size ?: 1) - 1
-            val reciprocatedUnits = result.summary?.reciprocatedUnits ?: 0
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (otherMatchingCardsCount > 0) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("+$otherMatchingCardsCount coincidentes", style = MaterialTheme.typography.labelSmall) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Style,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+            // Indicador de Cartas Recíprocas (Tú tienes N cartas que este usuario busca)
+            if (reciprocatedUnits > 0) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
                     )
-                }
-
-                if (reciprocatedUnits > 0) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("Posees $reciprocatedUnits que busca", style = MaterialTheme.typography.labelSmall) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Tú tienes $reciprocatedUnits carta${if (reciprocatedUnits > 1) "s" else ""} que @$username busca en su lista de deseos",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -636,11 +599,12 @@ fun MatchmakingCardItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateTransactionDialog(
+fun TransactionDialog(
     viewModel: HomeViewModel,
-    txState: TransactionState
+    txState: TransactionState,
+    onTransactionCreated: () -> Unit = {}
 ) {
-    val username = txState.targetUser?.username ?: "Ofertador"
+    val username = txState.targetUser?.username ?: "Usuario"
 
     AlertDialog(
         onDismissRequest = {
@@ -651,9 +615,9 @@ fun CreateTransactionDialog(
         title = {
             Text(
                 text = when (txState.step) {
-                    1 -> "Paso 1: Solicitar cartas"
-                    2 -> "Paso 2: Ofrecer de tu inventario"
-                    3 -> "Paso 3: Resumen de Transacción"
+                    1 -> "Seleccionar Solicitadas de @$username"
+                    2 -> "Seleccionar Ofrecidas de tu Inventario"
+                    3 -> "Resumen de la Transacción con @$username"
                     else -> "Resultado de la Transacción"
                 },
                 style = MaterialTheme.typography.titleLarge
@@ -673,7 +637,6 @@ fun CreateTransactionDialog(
                         CircularProgressIndicator()
                     }
                 } else if (txState.step == 4) {
-                    // Paso 4: Éxito o Error Final
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -711,27 +674,16 @@ fun CreateTransactionDialog(
                         }
                     }
                 } else when (txState.step) {
-                    1 -> Step1SolicitedCardsView(viewModel = viewModel, txState = txState, username = username)
-                    2 -> Step2OfferedCardsView(viewModel = viewModel, txState = txState)
+                    1 -> Step1SolicitedView(viewModel = viewModel, txState = txState)
+                    2 -> Step2OfferedView(viewModel = viewModel, txState = txState)
                     3 -> Step3SummaryView(viewModel = viewModel, txState = txState, username = username)
                 }
             }
         },
         confirmButton = {
             if (txState.step == 4) {
-                if (txState.transactionSuccessMessage != null) {
-                    Button(onClick = { viewModel.closeTransactionDialog() }) {
-                        Text("Aceptar")
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { viewModel.closeTransactionDialog() }) {
-                            Text("Cancelar")
-                        }
-                        Button(onClick = { viewModel.retryTransaction() }) {
-                            Text("Volver a intentarlo")
-                        }
-                    }
+                Button(onClick = { viewModel.closeTransactionDialog() }) {
+                    Text("Aceptar")
                 }
             } else when (txState.step) {
                 1 -> {
@@ -754,7 +706,7 @@ fun CreateTransactionDialog(
                 }
                 3 -> {
                     Button(
-                        onClick = { viewModel.submitTransaction() },
+                        onClick = { viewModel.submitTransaction(onSuccess = onTransactionCreated) },
                         enabled = !txState.isSubmittingTransaction && txState.selectedSolicitedCards.isNotEmpty()
                     ) {
                         if (txState.isSubmittingTransaction) {
@@ -784,14 +736,121 @@ fun CreateTransactionDialog(
 }
 
 @Composable
-fun Step1SolicitedCardsView(
+fun Step3SummaryView(
     viewModel: HomeViewModel,
     txState: TransactionState,
     username: String
 ) {
+    val totalSolicitedValue = txState.selectedSolicitedCards.values.sumOf { it.quantity * it.offeredPrice }
+    val totalSolicitedCount = txState.selectedSolicitedCards.values.sumOf { it.quantity }
+
+    val totalOfferedValue = txState.selectedOfferedCards.values.sumOf { it.quantity * (it.card.price ?: 0) }
+    val totalOfferedCount = txState.selectedOfferedCards.values.sumOf { it.quantity }
+
+    val diff = totalSolicitedValue - totalOfferedValue
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Cartas Solicitadas a @$username", style = MaterialTheme.typography.titleSmall)
+                    IconButton(onClick = { viewModel.goToTransactionStep(1) }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar solicitadas", modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Total cartas: $totalSolicitedCount", style = MaterialTheme.typography.bodySmall)
+                Text("Valor total: $$totalSolicitedValue", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Cartas Ofrecidas de tu Inventario", style = MaterialTheme.typography.titleSmall)
+                    IconButton(onClick = { viewModel.goToTransactionStep(2) }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar ofrecidas", modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                if (totalOfferedCount == 0) {
+                    Text("Sin cartas ofrecidas (Compra pura)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                } else {
+                    Text("Total cartas: $totalOfferedCount", style = MaterialTheme.typography.bodySmall)
+                    Text("Valor total: $$totalOfferedValue", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Balance Estimado de la Oferta",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val balanceText = when {
+                    diff > 0 -> "Debes pagar $$diff a @$username"
+                    diff < 0 -> "@$username te debe $${abs(diff)}"
+                    else -> "Intercambio equitativo (sin diferencia monetaria)"
+                }
+
+                Text(
+                    text = balanceText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        txState.transactionError?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+fun Step1SolicitedView(
+    viewModel: HomeViewModel,
+    txState: TransactionState
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "Cartas disponibles de @$username:",
+            text = "Selecciona las cartas que deseas solicitar:",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.secondary
         )
@@ -803,7 +862,7 @@ fun Step1SolicitedCardsView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "El usuario no tiene cartas disponibles.",
+                    text = "El usuario no tiene cartas disponibles en su inventario.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -854,7 +913,7 @@ fun Step1SolicitedCardsView(
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                     Text(
-                                        text = "Stock: ${card.availableStock ?: 1} | Precio original: $${card.price ?: 0}",
+                                        text = "Stock: ${card.availableStock ?: 1} | Precio: $${card.price ?: 0}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -881,7 +940,6 @@ fun Step1SolicitedCardsView(
                                 }
                             }
 
-                            // Controles de cantidad y precio ofertado (contraoferta)
                             if (isSelected && selectedItem != null) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                                 Row(
@@ -889,7 +947,6 @@ fun Step1SolicitedCardsView(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Control de Cantidad
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("Cant: ", style = MaterialTheme.typography.labelMedium)
                                         IconButton(
@@ -915,17 +972,16 @@ fun Step1SolicitedCardsView(
                                         }
                                     }
 
-                                    // Campo de Contraoferta (Precio)
                                     OutlinedTextField(
                                         value = "${selectedItem.offeredPrice}",
                                         onValueChange = { input ->
                                             val newPrice = input.toIntOrNull() ?: 0
-                                            viewModel.updateSolicitedCardOfferedPrice(id, newPrice)
+                                            viewModel.updateSolicitedCardPrice(id, newPrice)
                                         },
-                                        label = { Text("Precio c/u ($)") },
+                                        label = { Text("Precio ofertado c/u ($)") },
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        modifier = Modifier.width(130.dp)
+                                        modifier = Modifier.width(140.dp)
                                     )
                                 }
                             }
@@ -938,13 +994,13 @@ fun Step1SolicitedCardsView(
 }
 
 @Composable
-fun Step2OfferedCardsView(
+fun Step2OfferedView(
     viewModel: HomeViewModel,
     txState: TransactionState
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "Tus cartas para ofrecer (Opcional - Compra Pura si no seleccionas):",
+            text = "Selecciona las cartas que ofreces a cambio (opcional):",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.secondary
         )
@@ -1007,7 +1063,7 @@ fun Step2OfferedCardsView(
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                     Text(
-                                        text = "Stock: ${card.availableStock ?: 1} | Precio: $${card.price ?: 0}",
+                                        text = "Stock: ${card.availableStock ?: 1} | Precio tu carta: $${card.price ?: 0}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -1025,7 +1081,7 @@ fun Step2OfferedCardsView(
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
-                                                text = "¡El ofertador desea esta carta!",
+                                                text = "¡Este usuario desea esta carta!",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.primary
                                             )
@@ -1041,8 +1097,8 @@ fun Step2OfferedCardsView(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Cantidad a ofrecer: ", style = MaterialTheme.typography.labelMedium)
                                     Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Cantidad: ", style = MaterialTheme.typography.labelMedium)
                                         IconButton(
                                             onClick = {
                                                 viewModel.updateOfferedCardQuantity(id, selectedItem.quantity - 1)
@@ -1076,112 +1132,57 @@ fun Step2OfferedCardsView(
 }
 
 @Composable
-fun Step3SummaryView(
-    viewModel: HomeViewModel,
-    txState: TransactionState,
-    username: String
+fun EmptyContent(
+    isAllOffersMode: Boolean,
+    useUserCommune: Boolean,
+    useGeolocation: Boolean,
+    onRefresh: () -> Unit = {}
 ) {
-    val totalSolicitedValue = txState.selectedSolicitedCards.values.sumOf { it.quantity * it.offeredPrice }
-    val totalSolicitedCount = txState.selectedSolicitedCards.values.sumOf { it.quantity }
-
-    val totalOfferedValue = txState.selectedOfferedCards.values.sumOf { it.quantity * (it.card.price ?: 0) }
-    val totalOfferedCount = txState.selectedOfferedCards.values.sumOf { it.quantity }
-
-    val diff = totalSolicitedValue - totalOfferedValue
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
     ) {
-        // Resumen Solicitadas
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Solicitadas a @$username", style = MaterialTheme.typography.titleSmall)
-                    IconButton(onClick = { viewModel.goToTransactionStep(1) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar solicitadas", modifier = Modifier.size(16.dp))
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Total cartas: $totalSolicitedCount", style = MaterialTheme.typography.bodySmall)
-                Text("Valor total: $$totalSolicitedValue", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-
-        // Resumen Ofrecidas
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Ofrecidas por ti", style = MaterialTheme.typography.titleSmall)
-                    IconButton(onClick = { viewModel.goToTransactionStep(2) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar ofrecidas", modifier = Modifier.size(16.dp))
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                if (totalOfferedCount == 0) {
-                    Text("Compra pura (sin cartas ofrecidas)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                } else {
-                    Text("Total cartas: $totalOfferedCount", style = MaterialTheme.typography.bodySmall)
-                    Text("Valor total: $$totalOfferedValue", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-
-        // Balance y Diferencia Moneda
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Balance de la Transacción",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                val balanceText = when {
-                    diff > 0 -> "Debes pagar $$diff a @$username"
-                    diff < 0 -> "@$username te debe $${abs(diff)}"
-                    else -> "Intercambio equitativo (sin diferencia monetaria)"
-                }
-
-                Text(
-                    text = balanceText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        txState.transactionError?.let { error ->
-            Text(
-                text = error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+            Icon(
+                imageVector = Icons.Default.Style,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.secondary
             )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = if (useGeolocation) "No hay ofertas cercanas a tu ubicación actual."
+                else if (useUserCommune) "No se encontraron ofertas disponibles en tu comuna."
+                else "No hay ofertas disponibles en este momento.",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Prueba desactivando los filtros o agregando más cartas a tu lista de deseos.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedButton(
+                onClick = onRefresh,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Recargar ofertas")
+            }
         }
     }
 }
@@ -1206,7 +1207,7 @@ fun ErrorContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Error al cargar las ofertas",
+            text = "Error al obtener recomendaciones",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
@@ -1231,9 +1232,9 @@ fun ErrorContent(
 }
 
 private fun hasLocationPermission(context: Context): Boolean {
-    val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-    val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-    return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
+    val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    return fine || coarse
 }
 
 @SuppressLint("MissingPermission")
@@ -1244,28 +1245,17 @@ private fun fetchLocation(
 ) {
     if (!hasLocationPermission(context)) return
 
-    fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
-        if (lastLoc != null) {
-            onLocationObtained(lastLoc.latitude.toFloat(), lastLoc.longitude.toFloat())
+    fusedLocationClient.getCurrentLocation(
+        Priority.PRIORITY_HIGH_ACCURACY,
+        CancellationTokenSource().token
+    ).addOnSuccessListener { location ->
+        if (location != null) {
+            onLocationObtained(location.latitude.toFloat(), location.longitude.toFloat())
         } else {
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                CancellationTokenSource().token
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    onLocationObtained(location.latitude.toFloat(), location.longitude.toFloat())
+            fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
+                if (lastLoc != null) {
+                    onLocationObtained(lastLoc.latitude.toFloat(), lastLoc.longitude.toFloat())
                 }
-            }.addOnFailureListener { e ->
-                e.printStackTrace()
-            }
-        }
-    }.addOnFailureListener {
-        fusedLocationClient.getCurrentLocation(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            CancellationTokenSource().token
-        ).addOnSuccessListener { location ->
-            if (location != null) {
-                onLocationObtained(location.latitude.toFloat(), location.longitude.toFloat())
             }
         }
     }

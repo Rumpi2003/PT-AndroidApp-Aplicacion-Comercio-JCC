@@ -273,44 +273,44 @@ data class PostTransactionResponse(
     @Serializable
     data class Data(
         @SerialName("id_transaccion")
-        val transactionId: Int,
+        val transactionId: Int? = null,
         @SerialName("id_usuario_1")
-        val userId: Int,
+        val userId: Int? = null,
         @SerialName("id_usuario_2")
-        val otherUserId: Int,
+        val otherUserId: Int? = null,
         @SerialName("estado")
-        val transactionState: String,
+        val transactionState: String? = null,
         @SerialName("fecha_creacion")
-        val creationDate: String,
+        val creationDate: String? = null,
         @SerialName("diferencia_a_pagar_1")
-        val userDifferential: Int,
+        val userDifferential: Int? = null,
         @SerialName("diferencia_a_pagar_2")
-        val otherUserDifferential: Int,
+        val otherUserDifferential: Int? = null,
         @SerialName("deudor")
-        val debtorId: Int,
+        val debtorId: Int? = null,
         @SerialName("solicitadas")
-        val solicitedCards: List<SolicitedCard>,
+        val solicitedCards: List<SolicitedCard>? = null,
         @SerialName("ofrecidas")
-        val offeredCards: List<OfferedCard>
+        val offeredCards: List<OfferedCard>? = null
     ) {
         @Serializable
         data class SolicitedCard(
             @SerialName("id_carta_ofrecida")
-            val inventoryCardId: Int,
+            val inventoryCardId: Int? = null,
             @SerialName("cantidad")
-            val quantity: Int,
+            val quantity: Int? = null,
             @SerialName("precio_acordado")
-            val agreedUponPrice: Int
+            val agreedUponPrice: Int? = null
         )
 
         @Serializable
         data class OfferedCard(
             @SerialName("id_carta_ofrecida")
-            val inventoryCardId: Int,
+            val inventoryCardId: Int? = null,
             @SerialName("cantidad")
-            val quantity: Int,
+            val quantity: Int? = null,
             @SerialName("precio_acordado")
-            val agreedUponPrice: Int
+            val agreedUponPrice: Int? = null
         )
     }
 }

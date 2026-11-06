@@ -19,6 +19,8 @@ data class GetPrivateProfileResponse(
 ) {
     @Serializable
     data class Profile(
+        @SerialName("id_usuario")
+        val userId: Int? = null,
         @SerialName("comuna")
         val commune: Commune?,
         @SerialName("correo")
