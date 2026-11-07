@@ -50,7 +50,8 @@ import com.proyectotitulo.appcomerciojcc.domain.models.GetPublicProfileResponse
 fun PublicProfileScreen(
     userId: Int,
     viewModel: PublicProfileViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToReviews: (Int, String) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = PublicProfileUiState.Loading)
 
@@ -104,7 +105,8 @@ fun PublicProfileScreen(
                     is PublicProfileUiState.Success -> {
                         PublicProfileContent(
                             profile = state.profile,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            onNavigateToReviews = onNavigateToReviews
                         )
                     }
                 }
@@ -116,7 +118,8 @@ fun PublicProfileScreen(
 @Composable
 fun PublicProfileContent(
     profile: GetPublicProfileResponse.Profile,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToReviews: (Int, String) -> Unit = { _, _ -> }
 ) {
     val username = profile.username ?: "Usuario"
     val averageScore = profile.averageScore ?: 0f
@@ -234,6 +237,26 @@ fun PublicProfileContent(
             title = "Contacto",
             value = profile.contact?.takeIf { it.isNotBlank() } ?: "Contacto no público"
         )
+
+        // Botón "Ver reseñas"
+        Button(
+            onClick = {
+                profile.userId?.let { uid ->
+                    onNavigateToReviews(uid, profile.username.orEmpty())
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Ver reseñas de @${profile.username ?: "Usuario"}")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 

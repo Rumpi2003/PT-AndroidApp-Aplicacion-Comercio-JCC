@@ -1,5 +1,6 @@
 package com.proyectotitulo.appcomerciojcc.domain.models
 
+import com.proyectotitulo.appcomerciojcc.domain.models.GetPublicProfileResponse.Profile
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityResponse.ProfileVisibility
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -232,6 +233,55 @@ data class GetPublicProfileResponse(
             @SerialName("region")
             val region: String?,
         )
+    }
+}
+
+@Serializable
+data class GetReviewsResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: Data?  = null,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Data(
+        @SerialName("total")
+        val totalReviews: Int? = null,
+        @SerialName("resultados")
+        val results: List<Review>? = null
+    ) {
+        @Serializable
+        data class Review(
+            @SerialName("autor")
+            val author: User? = null,
+            @SerialName("puntuacion")
+            val score: Int? = null,
+            @SerialName("cuerpo")
+            val content: String? = null,
+            @SerialName("fecha_creacion")
+            val creationDate: String? = null
+        ) {
+            val formattedCreationDate: String?
+                get() = try {
+                    val zonedDateTime = ZonedDateTime.parse(creationDate)
+                    val outputFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
+
+                    zonedDateTime.format(outputFormatter)
+                } catch (e: Exception) {
+                    creationDate
+                }
+            @Serializable
+            data class User(
+                @SerialName("id_usuario")
+                val userId: Int? = null,
+                @SerialName("nombre_usuario")
+                val username: String? = null
+            )
+        }
     }
 }
 

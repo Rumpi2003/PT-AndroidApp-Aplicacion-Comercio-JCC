@@ -3,6 +3,7 @@ package com.proyectotitulo.appcomerciojcc.data.repository
 import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.domain.models.GetGeoModeResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetMatchmakingResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.GetMostPopularCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTradeInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.PostTransactionRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.PostTransactionRequest.SolicitedCard
@@ -139,5 +140,14 @@ class MatchmakingRepository {
         }
     }
 
+    suspend fun getMostPopularCards(): Result<GetMostPopularCardsResponse> {
+        return try {
+            val response: GetMostPopularCardsResponse = client.get("${KtorApiClient.BASE_URL}/popularidad/").body()
 
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
 }

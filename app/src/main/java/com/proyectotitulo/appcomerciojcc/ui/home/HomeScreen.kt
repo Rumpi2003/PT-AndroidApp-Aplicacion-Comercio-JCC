@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,6 +35,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
+import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -72,6 +86,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.proyectotitulo.appcomerciojcc.domain.models.GetMatchmakingResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.GetMostPopularCardsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetTradeInventoryResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.HomeUiState
 import com.proyectotitulo.appcomerciojcc.domain.models.TransactionState
@@ -80,18 +95,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LocationCity
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarOutline
-import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.SwapHoriz
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,6 +163,14 @@ fun HomeScreen(
                     totalOffers = uiState.totalRecommendations,
                     onBackClick = { viewModel.exitAllOffersMode() }
                 )
+
+                // Módulo de Popularidad (Top 10 Cartas más Populares del Mes)
+                if (!uiState.isAllOffersMode) {
+                    PopularCardsSection(
+                        popularCards = uiState.popularCards,
+                        isLoading = uiState.isLoadingPopularCards
+                    )
+                }
 
                 FilterSwitchesSection(
                     useUserCommune = uiState.useUserCommune,
@@ -253,6 +264,171 @@ fun HomeScreen(
                 txState = uiState.transactionState,
                 onTransactionCreated = onTransactionCreated
             )
+        }
+    }
+}
+
+@Composable
+fun PopularCardsSection(
+    popularCards: List<GetMostPopularCardsResponse.Card>,
+    isLoading: Boolean
+) {
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    } else if (popularCards.isNotEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Top 10 Cartas Más Populares del Mes",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(popularCards) { index, card ->
+                    PopularCardItem(
+                        rank = index + 1,
+                        card = card
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PopularCardItem(
+    rank: Int,
+    card: GetMostPopularCardsResponse.Card
+) {
+    Card(
+        modifier = Modifier
+            .width(180.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text("#$rank Top", style = MaterialTheme.typography.labelSmall) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        labelColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+
+            CardImageThumbnail(
+                model = card.miniatureUrl?.takeIf { it.isNotBlank() } ?: card.imageUrl,
+                contentDescription = card.cardName,
+                modifier = Modifier.size(75.dp, 105.dp)
+            )
+
+            Text(
+                text = card.cardName.orEmpty(),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = card.set.orEmpty(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = card.rarity.orEmpty(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Estadísticas (transacciones completadas y usuarios que la desean)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${card.completedTransactions ?: 0} intercambios",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Deseada por ${card.wantedByUsers ?: 0}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

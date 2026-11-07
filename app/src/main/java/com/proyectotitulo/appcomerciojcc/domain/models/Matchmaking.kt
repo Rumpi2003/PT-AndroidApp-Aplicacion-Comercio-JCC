@@ -1,5 +1,6 @@
 package com.proyectotitulo.appcomerciojcc.domain.models
 
+import com.proyectotitulo.appcomerciojcc.domain.models.PostTransactionResponse.Data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -315,6 +316,40 @@ data class PostTransactionResponse(
     }
 }
 
+@Serializable
+data class GetMostPopularCardsResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: List<Card>? = null,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Card(
+        @SerialName("id_tipo_carta")
+        val cardId: Int? = null,
+        @SerialName("nombre_carta")
+        val cardName: String? = null,
+        @SerialName("set")
+        val set: String? = null,
+        @SerialName("rareza")
+        val rarity: String? = null,
+        @SerialName("url_imagen")
+        val imageUrl: String? = null,
+        @SerialName("url_miniatura")
+        val miniatureUrl: String? = null,
+        @SerialName("transacciones_completadas")
+        val completedTransactions: Int? = null,
+        @SerialName("usuarios_que_la_desean")
+        val wantedByUsers: Int? = null,
+        @SerialName("puntaje")
+        val score: Int? = null
+    )
+}
+
 data class SelectedSolicitedCard(
     val card: GetTradeInventoryResponse.Card,
     val quantity: Int = 1,
@@ -353,5 +388,7 @@ data class HomeUiState(
     val isLoadingGeoMode: Boolean = false,
     val isRefreshing: Boolean = false,
     val errors: List<String>? = null,
-    val transactionState: TransactionState = TransactionState()
+    val transactionState: TransactionState = TransactionState(),
+    val popularCards: List<GetMostPopularCardsResponse.Card> = emptyList(),
+    val isLoadingPopularCards: Boolean = false
 )

@@ -23,6 +23,30 @@ class HomeViewModel : ViewModel() {
 
     init {
         loadRecommendations()
+        loadPopularCards()
+    }
+
+    fun loadPopularCards() {
+        viewModelScope.launch {
+            val currentState = _uiState.value ?: HomeUiState()
+            _uiState.value = currentState.copy(isLoadingPopularCards = true)
+
+            val result = repository.getMostPopularCards()
+            val latest = _uiState.value ?: HomeUiState()
+
+            result.onSuccess { response ->
+                if (response.status == "success") {
+                    _uiState.value = latest.copy(
+                        popularCards = response.data?.take(10) ?: emptyList(),
+                        isLoadingPopularCards = false
+                    )
+                } else {
+                    _uiState.value = latest.copy(isLoadingPopularCards = false)
+                }
+            }.onFailure {
+                _uiState.value = latest.copy(isLoadingPopularCards = false)
+            }
+        }
     }
 
     fun loadInitialGeoMode() {
@@ -46,6 +70,10 @@ class HomeViewModel : ViewModel() {
         val currentState = _uiState.value ?: HomeUiState()
         if (!forceRefresh && currentState.recommendations.isNotEmpty()) {
             return
+        }
+
+        if (forceRefresh) {
+            loadPopularCards()
         }
 
         viewModelScope.launch {

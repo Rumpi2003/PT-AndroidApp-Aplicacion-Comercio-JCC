@@ -78,7 +78,8 @@ import java.util.Locale
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel,
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onNavigateToReviews: (Int, String) -> Unit = { _, _ -> }
 ) {
 
     val uiState by viewModel.uiState.observeAsState(initial = ProfileUiState.Loading)
@@ -118,10 +119,10 @@ fun ProfileScreen(
                         Profile(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 24.dp, vertical = 16.dp),
-                            vArrangement = Arrangement.spacedBy(12.dp),
-                            hAlignment = Alignment.CenterHorizontally,
+                                .padding(horizontal = 24.dp),
                             profile = profile,
+                            vArrangement = Arrangement.spacedBy(16.dp),
+                            hAlignment = Alignment.CenterHorizontally,
                             onEditDescriptionClick = { showEditDescriptionDialog = true },
                             onEditCommuneClick = {
                                 viewModel.loadCommunes()
@@ -129,50 +130,65 @@ fun ProfileScreen(
                             },
                             onEditGeoRadiusClick = { showEditGeoRadiusDialog = true },
                             onVisibilityChange = { newVisibility ->
-                                viewModel.updateProfileVisibility(newVisibility) { success, error ->
-
-                                }
+                                viewModel.updateProfileVisibility(newVisibility) { _, _ -> }
                             },
-                            onLogoutClick = { showLogoutDialog = true }
+                            onLogoutClick = { showLogoutDialog = true },
+                            onNavigateToReviews = onNavigateToReviews
                         )
-                    }
 
-                    if (showEditDescriptionDialog) {
-                        EditDescriptionDialog(
-                            initialDescription = profile.profileDescription.orEmpty(),
-                            onDismissRequest = { showEditDescriptionDialog = false },
-                            onConfirm = { newDesc, onComplete ->
-                                viewModel.updateDescription(newDesc, onComplete)
-                            }
-                        )
-                    }
+                        if (showEditDescriptionDialog) {
+                            EditDescriptionDialog(
+                                initialDescription = profile.profileDescription.orEmpty(),
+                                onDismissRequest = { showEditDescriptionDialog = false },
+                                onConfirm = { newDescription, onResult ->
+                                    viewModel.updateDescription(newDescription) { success, errorMsg ->
+                                        onResult(success, errorMsg)
+                                        if (success) showEditDescriptionDialog = false
+                                    }
+                                }
+                            )
+                        }
 
-                    if (showEditCommuneDialog && profile.commune != null) {
-                        EditCommuneDialog(
-                            currentCommune = profile.commune,
-                            communesList = communesList,
-                            onDismissRequest = { showEditCommuneDialog = false },
-                            onConfirm = { selectedCommune, onComplete ->
-                                viewModel.updateCommune(selectedCommune, onComplete)
-                            }
-                        )
-                    }
+                        if (showEditCommuneDialog) {
+                            EditCommuneDialog(
+                                currentCommuneId = profile.commune?.communeId,
+                                communesList = communesList,
+                                onDismissRequest = { showEditCommuneDialog = false },
+                                onConfirm = { selectedCommune, onResult ->
+                                    if (selectedCommune != null) {
+                                        viewModel.updateCommune(selectedCommune) { success, errorMsg ->
+                                            onResult(success, errorMsg)
+                                            if (success) showEditCommuneDialog = false
+                                        }
+                                    } else {
+                                        onResult(false, "Selecciona una comuna válida")
+                                    }
+                                }
+                            )
+                        }
 
-                    if (showEditGeoRadiusDialog) {
-                        EditGeoRadiusDialog(
-                            currentGeoRadiusMeters = profile.geoRadius ?: 0,
-                            onDismissRequest = { showEditGeoRadiusDialog = false },
-                            onConfirm = { newRadiusMeters, onComplete ->
-                                viewModel.updateGeoRadius(newRadiusMeters, onComplete)
-                            }
-                        )
-                    }
+                        if (showEditGeoRadiusDialog) {
+                            EditGeoRadiusDialog(
+                                initialRadiusKm = (profile.geoRadius ?: 0) / 1000,
+                                onDismissRequest = { showEditGeoRadiusDialog = false },
+                                onConfirm = { newRadiusKm, onResult ->
+                                    viewModel.updateGeoRadius(newRadiusKm * 1000) { success, errorMsg ->
+                                        onResult(success, errorMsg)
+                                        if (success) showEditGeoRadiusDialog = false
+                                    }
+                                }
+                            )
+                        }
 
-                    if (showLogoutDialog) {
-                        ConfirmLogoutDialog(
-                            onDismissRequest = { showLogoutDialog = false },
-                            onConfirm = onLogout
-                        )
+                        if (showLogoutDialog) {
+                            LogoutConfirmDialog(
+                                onDismissRequest = { showLogoutDialog = false },
+                                onConfirmLogout = {
+                                    showLogoutDialog = false
+                                    onLogout()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -188,15 +204,16 @@ fun ProfileScreen(
 
 @Composable
 fun Profile(
-    modifier: Modifier,
-    vArrangement: Arrangement.Vertical,
-    hAlignment: Alignment.Horizontal,
+    modifier: Modifier = Modifier,
     profile: GetPrivateProfileResponse.Profile,
+    vArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
+    hAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     onEditDescriptionClick: () -> Unit,
     onEditCommuneClick: () -> Unit,
     onEditGeoRadiusClick: () -> Unit,
     onVisibilityChange: (Boolean) -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onNavigateToReviews: (Int, String) -> Unit = { _, _ -> }
 ) {
 
     val locale = LocalConfiguration.current.locales[0]
@@ -210,8 +227,7 @@ fun Profile(
     ) {
         HeaderProfileCard(
             username = profile.username ?: "Usuario",
-            averageScore = profile.averageScore ?: 0.0f,
-            onLogoutClick = onLogoutClick
+            averageScore = profile.averageScore ?: 0.0f
         )
         DescriptionCard(
             description = profile.profileDescription.orEmpty(),
@@ -240,6 +256,43 @@ fun Profile(
             isPublic = profile.profileVisibility ?: false,
             onVisibilityChange = onVisibilityChange
         )
+
+        Button(
+            onClick = {
+                profile.userId?.let { uid ->
+                    onNavigateToReviews(uid, profile.username.orEmpty())
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Ver mis reseñas recibidas")
+        }
+
+        Button(
+            onClick = onLogoutClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Cerrar Sesión")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -290,8 +343,7 @@ fun ErrorContent(
 @Composable
 fun HeaderProfileCard(
     username: String,
-    averageScore: Float,
-    onLogoutClick: () -> Unit
+    averageScore: Float
 ) {
 
     val filledStars = averageScore.toInt().coerceIn(0, 5)
@@ -299,92 +351,62 @@ fun HeaderProfileCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(MaterialTheme.shapes.large)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                            .align(Alignment.BottomEnd)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        text = username,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "@${username.lowercase()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        repeat(5) { index ->
-                            val icon =
-                                if (index < filledStars) Icons.Default.Star else Icons.Default.StarOutline
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "$averageScore",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = onLogoutClick,
-                shape = MaterialTheme.shapes.small,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp).align(Alignment.TopEnd)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.ExitToApp,
-                    contentDescription = "Cerrar sesión",
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(48.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Cerrar Sesión", style = MaterialTheme.typography.labelMedium)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = username,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "@${username.lowercase()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    repeat(5) { index ->
+                        val icon =
+                            if (index < filledStars) Icons.Default.Star else Icons.Default.StarOutline
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "$averageScore",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
         }
     }
@@ -464,33 +486,8 @@ fun ContactInfoCard(email: String, contact: String, registerDate: String) {
             )
             ProfileDetailItem(
                 icon = Icons.Default.CalendarToday,
-                label = "MIEMBRO DESDE",
+                label = "REGISTRADO DESDE EL",
                 value = registerDate
-            )
-        }
-    }
-}
-
-@Composable
-fun ProfileDetailItem(icon: ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground
             )
         }
     }
@@ -502,7 +499,7 @@ fun SingleActionCard(
     label: String,
     value: String,
     buttonText: String,
-    onEditClick: () -> Unit = {}
+    onEditClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -517,23 +514,25 @@ fun SingleActionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
                         text = value,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -549,6 +548,12 @@ fun SingleActionCard(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(text = buttonText, style = MaterialTheme.typography.labelMedium)
             }
         }
@@ -558,8 +563,8 @@ fun SingleActionCard(
 @Composable
 fun VisibilityCard(
     isPublic: Boolean,
-    enabled: Boolean = true,
-    onVisibilityChange: (Boolean) -> Unit) {
+    onVisibilityChange: (Boolean) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -573,31 +578,32 @@ fun VisibilityCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Visibility,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Visibilidad del perfil",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
+                        text = "PERFIL PÚBLICO",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        text = if (isPublic) "Público - visible para todos" else "Privado",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        text = if (isPublic) "Visible para otros usuarios" else "Oculto para otros usuarios",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
 
             Switch(
                 checked = isPublic,
-                enabled = enabled,
                 onCheckedChange = onVisibilityChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -610,64 +616,62 @@ fun VisibilityCard(
 }
 
 @Composable
+fun ProfileDetailItem(icon: ImageVector, label: String, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+    }
+}
+
+@Composable
 fun EditDescriptionDialog(
     initialDescription: String,
     onDismissRequest: () -> Unit,
     onConfirm: (String, (Boolean, String?) -> Unit) -> Unit
 ) {
     var descriptionText by remember { mutableStateOf(initialDescription) }
-    var isLoading by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val maxChar = 255
 
     AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismissRequest() },
-        title = {
-            Text(
-                text = "Editar descripción",
-                style = MaterialTheme.typography.titleLarge
-            )
+        onDismissRequest = {
+            if (!isSubmitting) onDismissRequest()
         },
+        title = { Text("Editar Descripción") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = descriptionText,
-                    onValueChange = {
-                        if (it.length <= maxChar) {
-                            descriptionText = it
-                        }
-                    },
-                    label = { Text("Descripción del perfil") },
-                    supportingText = {
-                        Text(
-                            text = "${descriptionText.length} / $maxChar",
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.End
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Icono Descripción"
-                        )
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    minLines = 3,
-                    maxLines = 5,
+                    onValueChange = { descriptionText = it },
+                    label = { Text("Biografía / Descripción") },
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading
+                    enabled = !isSubmitting
                 )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                errorMessage?.let { msg ->
                     Text(
-                        text = errorMessage!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        text = msg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -675,128 +679,102 @@ fun EditDescriptionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    isLoading = true
+                    isSubmitting = true
                     errorMessage = null
-                    onConfirm(descriptionText) { success, error ->
-                        isLoading = false
-                        if (success) {
-                            onDismissRequest()
-                        } else {
-                            errorMessage = error
+                    onConfirm(descriptionText) { success, msg ->
+                        isSubmitting = false
+                        if (!success) {
+                            errorMessage = msg ?: "Error al actualizar descripción"
                         }
                     }
                 },
-                enabled = !isLoading
+                enabled = !isSubmitting
             ) {
-                if (isLoading) {
+                if (isSubmitting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Aceptar")
+                    Text("Guardar")
                 }
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                enabled = !isLoading
+                enabled = !isSubmitting
             ) {
                 Text("Cancelar")
             }
         }
     )
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditCommuneDialog(
-    currentCommune: GetPrivateProfileResponse.Profile.Commune,
+    currentCommuneId: Int?,
     communesList: List<GetCommuneResponse.Commune>,
     onDismissRequest: () -> Unit,
-    onConfirm: (GetCommuneResponse.Commune, (Boolean, String?) -> Unit) -> Unit
+    onConfirm: (GetCommuneResponse.Commune?, (Boolean, String?) -> Unit) -> Unit
 ) {
     var selectedCommune by remember {
-        mutableStateOf<GetCommuneResponse.Commune?>(
-            GetCommuneResponse.Commune(
-                communeId = currentCommune.communeId,
-                communeName = currentCommune.communeName,
-                region = currentCommune.region
-            )
-        )
+        mutableStateOf(communesList.find { it.communeId == currentCommuneId })
     }
-    var expanded by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismissRequest() },
-        title = {
-            Text(
-                text = "Cambiar comuna",
-                style = MaterialTheme.typography.titleLarge
-            )
+        onDismissRequest = {
+            if (!isSubmitting) onDismissRequest()
         },
+        title = { Text("Seleccionar Comuna") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { if (!isLoading) expanded = it },
-                    modifier = Modifier.fillMaxWidth()
+                    expanded = isExpanded,
+                    onExpandedChange = { if (!isSubmitting) isExpanded = !isExpanded }
                 ) {
                     OutlinedTextField(
-                        value = selectedCommune?.let { "${it.communeName} (${it.region})" } ?: "",
+                        value = selectedCommune?.communeName ?: "Sin comuna asignada",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Comuna") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.HomeWork,
-                                contentDescription = "Icono Comuna"
-                            )
-                        },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                        },
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-                            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
-                            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
                         modifier = Modifier
                             .menuAnchor()
                             .fillMaxWidth(),
-                        enabled = !isLoading
+                        enabled = !isSubmitting
                     )
-
                     ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        expanded = isExpanded,
+                        onDismissRequest = { isExpanded = false }
                     ) {
-                        communesList.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text("Sin comuna asignada") },
+                            onClick = {
+                                selectedCommune = null
+                                isExpanded = false
+                            }
+                        )
+                        communesList.forEach { commune ->
                             DropdownMenuItem(
-                                text = { Text("${item.communeName} (${item.region})") },
+                                text = { Text("${commune.communeName} (${commune.region})") },
                                 onClick = {
-                                    selectedCommune = item
-                                    expanded = false
+                                    selectedCommune = commune
+                                    isExpanded = false
                                 }
                             )
                         }
                     }
                 }
-
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                errorMessage?.let { msg ->
                     Text(
-                        text = errorMessage!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        text = msg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -804,36 +782,31 @@ fun EditCommuneDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    selectedCommune?.let { commune ->
-                        isLoading = true
-                        errorMessage = null
-                        onConfirm(commune) { success, error ->
-                            isLoading = false
-                            if (success) {
-                                onDismissRequest()
-                            } else {
-                                errorMessage = error
-                            }
+                    isSubmitting = true
+                    errorMessage = null
+                    onConfirm(selectedCommune) { success, msg ->
+                        isSubmitting = false
+                        if (!success) {
+                            errorMessage = msg ?: "Error al actualizar comuna"
                         }
                     }
                 },
-                enabled = !isLoading && selectedCommune != null && selectedCommune?.communeId != currentCommune.communeId
+                enabled = !isSubmitting
             ) {
-                if (isLoading) {
+                if (isSubmitting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Aceptar")
+                    Text("Guardar")
                 }
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                enabled = !isLoading
+                enabled = !isSubmitting
             ) {
                 Text("Cancelar")
             }
@@ -843,59 +816,35 @@ fun EditCommuneDialog(
 
 @Composable
 fun EditGeoRadiusDialog(
-    currentGeoRadiusMeters: Int,
+    initialRadiusKm: Int,
     onDismissRequest: () -> Unit,
     onConfirm: (Int, (Boolean, String?) -> Unit) -> Unit
 ) {
-    var radiusMText by remember { mutableStateOf(currentGeoRadiusMeters.toString()) }
-    var isLoading by remember { mutableStateOf(false) }
+    var radiusText by remember { mutableStateOf(initialRadiusKm.toString()) }
+    var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
-        onDismissRequest = { if (!isLoading) onDismissRequest() },
-        title = {
-            Text(
-                text = "Cambiar radio de geolocalización",
-                style = MaterialTheme.typography.titleLarge
-            )
+        onDismissRequest = {
+            if (!isSubmitting) onDismissRequest()
         },
+        title = { Text("Editar Radio de Geolocalización") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = radiusMText,
-                    onValueChange = { input ->
-                        if (input.all { it.isDigit() } && input.length <= 4) {
-                            radiusMText = input
-                            errorMessage = null
-                        }
-                    },
-                    label = { Text("Radio de búsqueda (metros)") },
-                    supportingText = {
-                        Text("Ingresa la distancia máxima en metros (m)")
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Radar,
-                            contentDescription = "Icono Radio"
-                        )
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    singleLine = true,
+                    value = radiusText,
+                    onValueChange = { radiusText = it },
+                    label = { Text("Radio en Kilómetros (Km)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading
+                    enabled = !isSubmitting
                 )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                errorMessage?.let { msg ->
                     Text(
-                        text = errorMessage!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        text = msg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -903,39 +852,37 @@ fun EditGeoRadiusDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val m = radiusMText.toIntOrNull()
-                    if (m == null || m <= 200) {
-                        errorMessage = "Ingresa un número mayor a 200 m"
+                    val kmValue = radiusText.toIntOrNull()
+                    if (kmValue == null || kmValue <= 0) {
+                        errorMessage = "Ingresa un radio válido mayor a 0"
                         return@Button
                     }
-                    isLoading = true
+
+                    isSubmitting = true
                     errorMessage = null
-                    onConfirm(m) { success, error ->
-                        isLoading = false
-                        if (success) {
-                            onDismissRequest()
-                        } else {
-                            errorMessage = error
+                    onConfirm(kmValue) { success, msg ->
+                        isSubmitting = false
+                        if (!success) {
+                            errorMessage = msg ?: "Error al actualizar radio"
                         }
                     }
                 },
-                enabled = !isLoading && radiusMText.isNotEmpty()
+                enabled = !isSubmitting
             ) {
-                if (isLoading) {
+                if (isSubmitting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Aceptar")
+                    Text("Guardar")
                 }
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                enabled = !isLoading
+                enabled = !isSubmitting
             ) {
                 Text("Cancelar")
             }
@@ -944,36 +891,23 @@ fun EditGeoRadiusDialog(
 }
 
 @Composable
-fun ConfirmLogoutDialog(
+fun LogoutConfirmDialog(
     onDismissRequest: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirmLogout: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = {
-            Text(
-                text = "Cerrar sesión",
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            Text(
-                text = "¿Estás seguro de que deseas cerrar sesión?",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
+        title = { Text("Cerrar Sesión") },
+        text = { Text("¿Estás seguro de que deseas cerrar sesión?") },
         confirmButton = {
             Button(
-                onClick =  {
-                    onDismissRequest()
-                    onConfirm()
-                },
+                onClick = onConfirmLogout,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError
                 )
             ) {
-                Text("Cerrar sesión")
+                Text("Sí, Cerrar Sesión")
             }
         },
         dismissButton = {

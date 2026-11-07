@@ -4,6 +4,7 @@ import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetPublicProfileResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.GetReviewsResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateDescriptionRequest
@@ -14,6 +15,7 @@ import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityResponse
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -103,6 +105,24 @@ class ProfileRepository {
     suspend fun getPublicProfile(otherUserId: Int): Result<GetPublicProfileResponse> {
         return try {
             val response: GetPublicProfileResponse = client.get("${KtorApiClient.BASE_URL}/usuarios/${otherUserId}").body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getReviews(
+        userId: Int,
+        limit: Int = 20,
+        offset: Int = 0
+    ): Result<GetReviewsResponse> {
+        return try {
+            val response: GetReviewsResponse = client.get("${KtorApiClient.BASE_URL}/usuarios/${userId}/resenas") {
+                parameter("limite", limit)
+                parameter("offset", offset)
+            }.body()
 
             Result.success(response)
         } catch (e: Exception) {

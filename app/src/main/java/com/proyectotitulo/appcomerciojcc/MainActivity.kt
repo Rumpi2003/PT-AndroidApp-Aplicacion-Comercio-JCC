@@ -34,12 +34,15 @@ import com.proyectotitulo.appcomerciojcc.ui.navigation.HomeRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.InventoryRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.ProfileRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.PublicProfileRoute
+import com.proyectotitulo.appcomerciojcc.ui.navigation.ReviewsRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.SearchRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.TradeRoute
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileScreen
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileViewModel
 import com.proyectotitulo.appcomerciojcc.ui.profile.PublicProfileScreen
 import com.proyectotitulo.appcomerciojcc.ui.profile.PublicProfileViewModel
+import com.proyectotitulo.appcomerciojcc.ui.profile.ReviewsScreen
+import com.proyectotitulo.appcomerciojcc.ui.profile.ReviewsViewModel
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchScreen
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 import com.proyectotitulo.appcomerciojcc.ui.trade.TradeScreen
@@ -194,6 +197,9 @@ class MainActivity : ComponentActivity() {
                                             popUpTo(0) { inclusive = true }
                                         }
                                     }
+                                },
+                                onNavigateToReviews = { userId, username ->
+                                    navController.navigate(ReviewsRoute(userId, username))
                                 }
                             )
                         }
@@ -206,6 +212,25 @@ class MainActivity : ComponentActivity() {
                                 viewModel = publicProfileViewModel,
                                 onBackClick = {
                                     navController.popBackStack()
+                                },
+                                onNavigateToReviews = { userId, username ->
+                                    navController.navigate(ReviewsRoute(userId, username))
+                                }
+                            )
+                        }
+
+                        composable<ReviewsRoute> { backStackEntry ->
+                            val route = backStackEntry.toRoute<ReviewsRoute>()
+                            val reviewsViewModel: ReviewsViewModel = viewModel()
+                            ReviewsScreen(
+                                userId = route.userId,
+                                username = route.username,
+                                viewModel = reviewsViewModel,
+                                onBackClick = {
+                                    navController.popBackStack()
+                                },
+                                onUserClick = { authorUserId ->
+                                    navController.navigate(PublicProfileRoute(authorUserId))
                                 }
                             )
                         }

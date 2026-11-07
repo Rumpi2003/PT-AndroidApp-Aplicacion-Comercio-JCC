@@ -26,3 +26,6 @@ object ProfileRoute
 
 @Serializable
 data class PublicProfileRoute(val userId: Int)
+
+@Serializable
+data class ReviewsRoute(val userId: Int, val username: String)
