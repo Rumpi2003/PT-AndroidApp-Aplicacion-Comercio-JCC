@@ -1,5 +1,6 @@
 package com.proyectotitulo.appcomerciojcc.domain.models
 
+import com.proyectotitulo.appcomerciojcc.domain.models.UpdateVisibilityResponse.ProfileVisibility
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.ZonedDateTime
@@ -181,6 +182,57 @@ data class UpdateVisibilityResponse(
         @SerialName("visibilidad_perfil")
         val profileVisibility: Boolean? = null
     )
+}
+
+@Serializable
+data class GetPublicProfileResponse(
+    @SerialName("status")
+    val status: String,
+    @SerialName("message")
+    val message: String,
+    @SerialName("data")
+    val data: Profile?  = null,
+    @SerialName("errors")
+    val errors: List<String>? = null
+) {
+    @Serializable
+    data class Profile(
+        @SerialName("id_usuario")
+        val userId: Int? = null,
+        @SerialName("nombre_usuario")
+        val username: String? = null,
+        @SerialName("descripcion_perfil")
+        val profileDescription: String? = null,
+        @SerialName("puntuacion_promedio")
+        val averageScore: Float? = null,
+        @SerialName("total_resenas")
+        val totalReviews: Int? = null,
+        @SerialName("fecha_registro")
+        val registerDate: String? = null,
+        @SerialName("comuna")
+        val commune: Commune? = null,
+        @SerialName("contacto")
+        val contact: String? = null
+    ) {
+        val formattedRegisterDate: String?
+            get() = try {
+                val zonedDateTime = ZonedDateTime.parse(registerDate)
+                val outputFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
+
+                zonedDateTime.format(outputFormatter)
+            } catch (e: Exception) {
+                registerDate
+            }
+        @Serializable
+        data class Commune(
+            @SerialName("id_comuna")
+            val communeId: Int?,
+            @SerialName("nombre_comuna")
+            val communeName: String?,
+            @SerialName("region")
+            val region: String?,
+        )
+    }
 }
 
 sealed interface ProfileUiState {

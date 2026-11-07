@@ -3,6 +3,7 @@ package com.proyectotitulo.appcomerciojcc.data.repository
 import com.proyectotitulo.appcomerciojcc.data.remote.KtorApiClient
 import com.proyectotitulo.appcomerciojcc.domain.models.GetCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.GetPrivateProfileResponse
+import com.proyectotitulo.appcomerciojcc.domain.models.GetPublicProfileResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneRequest
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateCommuneResponse
 import com.proyectotitulo.appcomerciojcc.domain.models.UpdateDescriptionRequest
@@ -91,6 +92,17 @@ class ProfileRepository {
                 contentType(ContentType.Application.Json)
                 setBody(UpdateVisibilityRequest(profileVisibility))
             }.body()
+
+            Result.success(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPublicProfile(otherUserId: Int): Result<GetPublicProfileResponse> {
+        return try {
+            val response: GetPublicProfileResponse = client.get("${KtorApiClient.BASE_URL}/usuarios/${otherUserId}").body()
 
             Result.success(response)
         } catch (e: Exception) {

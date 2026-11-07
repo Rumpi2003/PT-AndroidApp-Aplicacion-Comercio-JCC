@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.proyectotitulo.appcomerciojcc.ui.login.LoginScreen
 import com.proyectotitulo.appcomerciojcc.ui.login.LoginViewModel
 import com.proyectotitulo.appcomerciojcc.ui.navigation.LoginRoute
@@ -32,10 +33,13 @@ import com.proyectotitulo.appcomerciojcc.ui.inventory.InventoryViewModel
 import com.proyectotitulo.appcomerciojcc.ui.navigation.HomeRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.InventoryRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.ProfileRoute
+import com.proyectotitulo.appcomerciojcc.ui.navigation.PublicProfileRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.SearchRoute
 import com.proyectotitulo.appcomerciojcc.ui.navigation.TradeRoute
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileScreen
 import com.proyectotitulo.appcomerciojcc.ui.profile.ProfileViewModel
+import com.proyectotitulo.appcomerciojcc.ui.profile.PublicProfileScreen
+import com.proyectotitulo.appcomerciojcc.ui.profile.PublicProfileViewModel
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchScreen
 import com.proyectotitulo.appcomerciojcc.ui.search.SearchViewModel
 import com.proyectotitulo.appcomerciojcc.ui.trade.TradeScreen
@@ -157,13 +161,19 @@ class MainActivity : ComponentActivity() {
 
                         composable<HomeRoute> {
                             HomeScreen(
-                                viewModel = homeViewModel
+                                viewModel = homeViewModel,
+                                onUserClick = { userId ->
+                                    navController.navigate(PublicProfileRoute(userId))
+                                }
                             )
                         }
 
                         composable<TradeRoute> {
                             TradeScreen(
-                                viewModel = tradeViewModel
+                                viewModel = tradeViewModel,
+                                onUserClick = { userId ->
+                                    navController.navigate(PublicProfileRoute(userId))
+                                }
                             )
                         }
 
@@ -184,6 +194,18 @@ class MainActivity : ComponentActivity() {
                                             popUpTo(0) { inclusive = true }
                                         }
                                     }
+                                }
+                            )
+                        }
+
+                        composable<PublicProfileRoute> { backStackEntry ->
+                            val route = backStackEntry.toRoute<PublicProfileRoute>()
+                            val publicProfileViewModel: PublicProfileViewModel = viewModel()
+                            PublicProfileScreen(
+                                userId = route.userId,
+                                viewModel = publicProfileViewModel,
+                                onBackClick = {
+                                    navController.popBackStack()
                                 }
                             )
                         }

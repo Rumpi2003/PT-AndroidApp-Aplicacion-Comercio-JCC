@@ -211,6 +211,22 @@ fun Search(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "Búsqueda de Cartas",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Explora cartas de diferentes TCGs y añádelas a tu colección",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+
         SearchBar(
             query = uiState.query,
             onQueryChanged = { viewModel.onQueryChanged(it) },

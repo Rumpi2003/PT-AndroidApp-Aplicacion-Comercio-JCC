@@ -92,14 +92,11 @@ fun InventoryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { innerPadding ->
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
             PullToRefreshBox(
@@ -211,6 +208,13 @@ fun InventoryScreen(
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+        )
     }
 }
 
@@ -226,6 +230,23 @@ fun Inventory(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "Mi Colección",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Gestiona tu inventario disponible y tu lista de deseos",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+
         TabSelection(
             selectedTab = uiState.selectedTab,
             selectTab = { viewModel.selectTab(it) }

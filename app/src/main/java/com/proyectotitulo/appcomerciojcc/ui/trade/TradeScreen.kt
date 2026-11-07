@@ -111,7 +111,8 @@ import kotlin.math.abs
 @Composable
 fun TradeScreen(
     modifier: Modifier = Modifier,
-    viewModel: TradeViewModel
+    viewModel: TradeViewModel,
+    onUserClick: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = TradeUiState())
 
@@ -131,9 +132,17 @@ fun TradeScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             if (uiState.isHistoryView) {
-                HistoryTransactionsContent(viewModel = viewModel, uiState = uiState)
+                HistoryTransactionsContent(
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    onUserClick = onUserClick
+                )
             } else {
-                ActiveTransactionsContent(viewModel = viewModel, uiState = uiState)
+                ActiveTransactionsContent(
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    onUserClick = onUserClick
+                )
             }
         }
 
@@ -198,7 +207,8 @@ fun TradeScreen(
 @Composable
 fun ActiveTransactionsContent(
     viewModel: TradeViewModel,
-    uiState: TradeUiState
+    uiState: TradeUiState,
+    onUserClick: (Int) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -282,7 +292,8 @@ fun ActiveTransactionsContent(
                                     },
                                     onCompleteTransaction = { txId, uname, counterpartUserId ->
                                         viewModel.completeTransaction(txId, uname, counterpartUserId)
-                                    }
+                                    },
+                                    onUserClick = onUserClick
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
@@ -336,7 +347,8 @@ fun ActiveTransactionsContent(
                                     },
                                     onCompleteTransaction = { txId, uname, counterpartUserId ->
                                         viewModel.completeTransaction(txId, uname, counterpartUserId)
-                                    }
+                                    },
+                                    onUserClick = onUserClick
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
@@ -395,7 +407,8 @@ fun ActiveTransactionsContent(
                                         },
                                         onCompleteTransaction = { txId, uname, counterpartUserId ->
                                             viewModel.completeTransaction(txId, uname, counterpartUserId)
-                                        }
+                                        },
+                                        onUserClick = onUserClick
                                     )
                                 }
 
@@ -449,7 +462,8 @@ fun ActiveTransactionsContent(
 @Composable
 fun HistoryTransactionsContent(
     viewModel: TradeViewModel,
-    uiState: TradeUiState
+    uiState: TradeUiState,
+    onUserClick: (Int) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -547,7 +561,8 @@ fun HistoryTransactionsContent(
                         result = tx,
                         onOpenPendingSummary = { txId ->
                             viewModel.openPendingSummary(txId)
-                        }
+                        },
+                        onUserClick = onUserClick
                     )
                 }
 
@@ -584,7 +599,8 @@ fun TransactionCardItem(
     onOpenChat: (Int, String, Int) -> Unit = { _, _, _ -> },
     onOpenPendingSummary: (Int) -> Unit = {},
     onCancelTransaction: (Int, String) -> Unit = { _, _ -> },
-    onCompleteTransaction: (Int, String, Int) -> Unit = { _, _, _ -> }
+    onCompleteTransaction: (Int, String, Int) -> Unit = { _, _, _ -> },
+    onUserClick: (Int) -> Unit = {}
 ) {
     val state = result.transactionState.orEmpty()
     val role = result.role.orEmpty()
@@ -632,7 +648,12 @@ fun TransactionCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        if (counterpartUserId != 0) onUserClick(counterpartUserId)
+                    }
+                ) {
                     Box(
                         modifier = Modifier
                             .size(32.dp)

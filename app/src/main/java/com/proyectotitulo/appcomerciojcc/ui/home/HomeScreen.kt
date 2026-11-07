@@ -33,18 +33,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LocationCity
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarOutline
-import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -90,13 +78,28 @@ import com.proyectotitulo.appcomerciojcc.domain.models.TransactionState
 import com.proyectotitulo.appcomerciojcc.ui.components.CardImageThumbnail
 import java.util.Locale
 import kotlin.math.abs
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
+import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.SwapHoriz
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel,
-    onTransactionCreated: () -> Unit = {}
+    onTransactionCreated: () -> Unit = {},
+    onUserClick: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = HomeUiState())
     val context = LocalContext.current
@@ -124,10 +127,14 @@ fun HomeScreen(
         }
     }
 
+    // Bucle periódico de envío de ubicación cada 30 segundos mientras el modo geolocalización esté activo
     LaunchedEffect(uiState.useGeolocation) {
         if (uiState.useGeolocation && hasLocationPermission(context)) {
-            requestLocationAndSend { lat, lng ->
-                viewModel.sendLocationAndUpdateMatchmaking(lat, lng)
+            while (isActive && uiState.useGeolocation) {
+                requestLocationAndSend { lat, lng ->
+                    viewModel.sendLocationAndUpdateMatchmaking(lat, lng)
+                }
+                delay(30000)
             }
         }
     }
@@ -216,7 +223,8 @@ fun HomeScreen(
                                     result = result,
                                     onInitiateTransaction = { user ->
                                         viewModel.openTransactionDialog(user)
-                                    }
+                                    },
+                                    onUserClick = onUserClick
                                 )
                             }
 
@@ -413,7 +421,8 @@ fun HomeHeader(
 @Composable
 fun MatchmakingCardItem(
     result: GetMatchmakingResponse.Data.Result,
-    onInitiateTransaction: (GetMatchmakingResponse.Data.Result.User) -> Unit
+    onInitiateTransaction: (GetMatchmakingResponse.Data.Result.User) -> Unit,
+    onUserClick: (Int) -> Unit = {}
 ) {
     val username = result.user?.username ?: "Usuario"
     val averageScore = result.user?.averageScore ?: 0f
@@ -442,7 +451,12 @@ fun MatchmakingCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        result.user?.userId?.let { uid -> onUserClick(uid) }
+                    }
+                ) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)

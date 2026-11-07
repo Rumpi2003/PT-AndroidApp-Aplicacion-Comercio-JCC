@@ -23,3 +23,6 @@ object TradeRoute
 
 @Serializable
 object ProfileRoute
+
+@Serializable
+data class PublicProfileRoute(val userId: Int)
