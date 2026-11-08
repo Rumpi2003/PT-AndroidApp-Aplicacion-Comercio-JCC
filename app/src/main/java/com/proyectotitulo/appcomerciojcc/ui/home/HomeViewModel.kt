@@ -24,6 +24,7 @@ class HomeViewModel : ViewModel() {
     init {
         loadRecommendations()
         loadPopularCards()
+        loadInitialGeoMode()
     }
 
     fun loadPopularCards() {
@@ -271,6 +272,34 @@ class HomeViewModel : ViewModel() {
                     isLoading = false,
                     errors = listOf(error.message ?: "Error al activar modo geolocalización")
                 )
+            }
+        }
+    }
+
+    fun updatePeriodicLocation(latitude: Float, longitude: Float) {
+        viewModelScope.launch {
+            val locationResult = repository.updateLocation(latitude, longitude)
+
+            locationResult.onSuccess { locResponse ->
+                if (locResponse.status == "success") {
+                    val currentState = _uiState.value ?: HomeUiState()
+                    val result = repository.getMatchmaking(
+                        limit = if (currentState.isAllOffersMode) 50 else 5,
+                        offset = 0,
+                        useGeolocation = true,
+                        userCommune = false
+                    )
+
+                    result.onSuccess { response ->
+                        if (response.status == "success") {
+                            val latest = _uiState.value ?: HomeUiState()
+                            _uiState.value = latest.copy(
+                                recommendations = response.data?.results ?: emptyList(),
+                                totalRecommendations = response.data?.total ?: 0
+                            )
+                        }
+                    }
+                }
             }
         }
     }

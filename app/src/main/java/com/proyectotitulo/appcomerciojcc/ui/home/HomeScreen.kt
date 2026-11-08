@@ -134,10 +134,12 @@ fun HomeScreen(
     LaunchedEffect(uiState.useGeolocation) {
         if (uiState.useGeolocation && hasLocationPermission(context)) {
             while (isActive && uiState.useGeolocation) {
-                requestLocationAndSend { lat, lng ->
-                    viewModel.sendLocationAndUpdateMatchmaking(lat, lng)
-                }
                 delay(30000)
+                if (isActive && uiState.useGeolocation) {
+                    requestLocationAndSend { lat, lng ->
+                        viewModel.updatePeriodicLocation(lat, lng)
+                    }
+                }
             }
         }
     }
@@ -157,65 +159,67 @@ fun HomeScreen(
             },
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                HomeHeader(
-                    isAllOffersMode = uiState.isAllOffersMode,
-                    totalOffers = uiState.totalRecommendations,
-                    onBackClick = { viewModel.exitAllOffersMode() }
-                )
-
-                // Módulo de Popularidad (Top 10 Cartas más Populares del Mes)
-                if (!uiState.isAllOffersMode) {
-                    PopularCardsSection(
-                        popularCards = uiState.popularCards,
-                        isLoading = uiState.isLoadingPopularCards
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 1. Header
+                item {
+                    HomeHeader(
+                        isAllOffersMode = uiState.isAllOffersMode,
+                        totalOffers = uiState.totalRecommendations,
+                        onBackClick = { viewModel.exitAllOffersMode() }
                     )
                 }
 
-                FilterSwitchesSection(
-                    useUserCommune = uiState.useUserCommune,
-                    useGeolocation = uiState.useGeolocation,
-                    isCommuneSwitchEnabled = !uiState.useGeolocation,
-                    onUserCommuneToggle = { enabled -> viewModel.toggleUserCommuneFilter(enabled) },
-                    onGeolocationToggle = { enabled ->
-                        viewModel.toggleGeolocationFilter(enabled) {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
+                // 2. Módulo de Popularidad (Top 10 Cartas más Populares del Mes)
+                if (!uiState.isAllOffersMode) {
+                    item {
+                        PopularCardsSection(
+                            popularCards = uiState.popularCards,
+                            isLoading = uiState.isLoadingPopularCards
+                        )
                     }
-                )
+                }
 
-                if (uiState.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                } else if (uiState.errors != null) {
-                    ErrorContent(
-                        errors = uiState.errors,
-                        onRetry = {
-                            if (uiState.isAllOffersMode) {
-                                viewModel.loadAllOffers(forceRefresh = true)
-                            } else {
-                                viewModel.loadRecommendations(forceRefresh = true)
+                // 3. Filtros
+                item {
+                    FilterSwitchesSection(
+                        useUserCommune = uiState.useUserCommune,
+                        useGeolocation = uiState.useGeolocation,
+                        isCommuneSwitchEnabled = !uiState.useGeolocation,
+                        onUserCommuneToggle = { enabled -> viewModel.toggleUserCommuneFilter(enabled) },
+                        onGeolocationToggle = { enabled ->
+                            viewModel.toggleGeolocationFilter(enabled) {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
                             }
                         }
                     )
-                } else {
-                    val currentList = uiState.recommendations
+                }
 
-                    if (currentList.isEmpty()) {
-                        EmptyContent(
-                            isAllOffersMode = uiState.isAllOffersMode,
-                            useUserCommune = uiState.useUserCommune,
-                            useGeolocation = uiState.useGeolocation,
-                            onRefresh = {
+                // 4. Estado de Carga, Error o Contenido de Emparejamientos
+                if (uiState.isLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else if (uiState.errors != null) {
+                    item {
+                        ErrorContent(
+                            errors = uiState.errors,
+                            onRetry = {
                                 if (uiState.isAllOffersMode) {
                                     viewModel.loadAllOffers(forceRefresh = true)
                                 } else {
@@ -223,13 +227,28 @@ fun HomeScreen(
                                 }
                             }
                         )
+                    }
+                } else {
+                    val currentList = uiState.recommendations
+
+                    if (currentList.isEmpty()) {
+                        item {
+                            EmptyContent(
+                                isAllOffersMode = uiState.isAllOffersMode,
+                                useUserCommune = uiState.useUserCommune,
+                                useGeolocation = uiState.useGeolocation,
+                                onRefresh = {
+                                    if (uiState.isAllOffersMode) {
+                                        viewModel.loadAllOffers(forceRefresh = true)
+                                    } else {
+                                        viewModel.loadRecommendations(forceRefresh = true)
+                                    }
+                                }
+                            )
+                        }
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(currentList) { result ->
+                        items(currentList) { result ->
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 MatchmakingCardItem(
                                     result = result,
                                     onInitiateTransaction = { user ->
@@ -238,11 +257,12 @@ fun HomeScreen(
                                     onUserClick = onUserClick
                                 )
                             }
+                        }
 
-                            // Mostrar el botón de ver todas las ofertas sólo si no estamos en el modo de todas las ofertas y hay más de 5
-                            if (!uiState.isAllOffersMode && uiState.totalRecommendations > 5) {
-                                item {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                        // Mostrar el botón de ver todas las ofertas sólo si no estamos en el modo de todas las ofertas y hay más de 5
+                        if (!uiState.isAllOffersMode && uiState.totalRecommendations > 5) {
+                            item {
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                                     Button(
                                         onClick = { viewModel.loadAllOffers(forceRefresh = true) },
                                         modifier = Modifier.fillMaxWidth(),
@@ -681,15 +701,19 @@ fun MatchmakingCardItem(
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                             }
+                        }
 
-                            result.distance?.let { m ->
-                                val km = m / 1000f
-                                Text(
-                                    text = " • ${String.format(Locale.getDefault(), "%.1f", km)} km",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                        result.distance?.let { meters ->
+                            val distanceText = if (result.distanceAprox == true) {
+                                "a menos de $meters metros"
+                            } else {
+                                "a $meters metros"
                             }
+                            Text(
+                                text = distanceText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }

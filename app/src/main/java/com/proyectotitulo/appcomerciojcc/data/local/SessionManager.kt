@@ -15,7 +15,15 @@ class SessionManager(context: Context) {
         return prefs.getString("jwt_token", null)
     }
 
+    fun saveFcmToken(fcmToken: String) {
+        prefs.edit().putString("fcm_token", fcmToken).apply()
+    }
+
+    fun getFcmToken(): String? {
+        return prefs.getString("fcm_token", null)
+    }
+
     fun clearSession() {
-        prefs.edit().remove("jwt_token").apply()
+        prefs.edit().remove("jwt_token").remove("fcm_token").apply()
     }
 }

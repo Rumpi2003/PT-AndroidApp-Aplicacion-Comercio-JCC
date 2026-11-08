@@ -48,6 +48,7 @@ dependencies {
     implementation("io.socket:socket.io-client:2.1.0")
 
     implementation("com.google.android.gms:play-services-location:21.2.0")
+    implementation("com.google.firebase:firebase-messaging-ktx:24.0.0")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
